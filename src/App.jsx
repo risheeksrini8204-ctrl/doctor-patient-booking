@@ -606,7 +606,7 @@ export default function App() {
             </div>
 
             {/* Doctor timings summary */}
-            <div style={{ background: 'rgba(0,0,0,0.02)', padding: '1rem', borderRadius: var(--radius-md), marginTop: '0.5rem' }}>
+            <div style={{ background: 'rgba(0,0,0,0.02)', padding: '1rem', borderRadius: 'var(--radius-md)', marginTop: '0.5rem' }}>
               <h4 style={{ fontSize: '0.9rem', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'center' }}>
                 <Clock size={16} /> Clinic Hours
               </h4>
@@ -1160,7 +1160,7 @@ export default function App() {
             <img 
               src={modalImage} 
               alt="Full size feedback preview" 
-              style={{ maxWidth: '100%', maxHeight: '75vh', borderRadius: '8px', objectFit: 'contain', boxShadow: var(--shadow-md) }} 
+              style={{ maxWidth: '100%', maxHeight: '75vh', borderRadius: '8px', objectFit: 'contain', boxShadow: 'var(--shadow-md)' }} 
             />
           </div>
         </div>
