@@ -847,3 +847,232 @@ body.dark-mode .info-label {
   font-size: 0.95rem;
   font-weight: 500;
 }
+
+/* ================= PROFESSIONAL SECURITY & OTP STYLES ================= */
+.input-with-icon-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-with-icon-wrapper .form-input {
+  width: 100%;
+  padding-right: 2.75rem;
+  box-sizing: border-box;
+}
+
+.input-icon-btn {
+  position: absolute;
+  right: 0.75rem;
+  background: transparent;
+  border: none;
+  color: var(--text-light-muted);
+  cursor: pointer;
+  padding: 0.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition-fast);
+}
+body.dark-mode .input-icon-btn {
+  color: var(--text-dark-muted);
+}
+.input-icon-btn:hover {
+  color: var(--primary);
+}
+
+/* Step Wizard Progress Header */
+.wizard-steps {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2rem;
+  position: relative;
+}
+.wizard-steps::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 10%;
+  right: 10%;
+  height: 2px;
+  background: var(--border-light);
+  z-index: 0;
+  transform: translateY(-50%);
+}
+body.dark-mode .wizard-steps::before {
+  background: var(--border-dark);
+}
+
+.wizard-step-item {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+}
+.wizard-step-number {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--bg-light-300);
+  color: var(--text-light-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.9rem;
+  border: 2px solid var(--bg-light-100);
+  transition: var(--transition-smooth);
+}
+body.dark-mode .wizard-step-number {
+  background: var(--bg-dark-700);
+  color: var(--text-dark-secondary);
+  border-color: var(--bg-dark-800);
+}
+
+.wizard-step-item.active .wizard-step-number {
+  background: var(--primary);
+  color: white;
+  box-shadow: 0 0 0 4px var(--primary-glow);
+}
+.wizard-step-item.completed .wizard-step-number {
+  background: var(--accent-success);
+  color: white;
+}
+
+.wizard-step-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-light-muted);
+}
+body.dark-mode .wizard-step-title {
+  color: var(--text-dark-muted);
+}
+.wizard-step-item.active .wizard-step-title {
+  color: var(--primary);
+}
+
+/* OTP Digits Input Display */
+.otp-input-box {
+  font-family: monospace;
+  font-size: 1.8rem;
+  letter-spacing: 0.6rem;
+  text-align: center;
+  font-weight: 700;
+  padding: 0.75rem;
+  background: rgba(172, 85%, 35%, 0.04);
+  border: 2px dashed var(--primary);
+  border-radius: var(--radius-md);
+  color: var(--primary);
+}
+body.dark-mode .otp-input-box {
+  background: rgba(172, 85%, 35%, 0.1);
+  color: hsl(172, 85%, 55%);
+}
+
+/* Simulated Email Popup Banner */
+.simulated-email-card {
+  background: linear-gradient(135deg, hsl(220, 25%, 15%), hsl(220, 30%, 10%));
+  color: white;
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: var(--shadow-lg);
+  margin-bottom: 1.5rem;
+  animation: slideUp 0.3s ease-out;
+}
+.simulated-email-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding-bottom: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+.simulated-otp-code {
+  font-size: 1.4rem;
+  font-weight: 800;
+  letter-spacing: 0.2rem;
+  background: rgba(255, 255, 255, 0.15);
+  padding: 0.4rem 1rem;
+  border-radius: var(--radius-sm);
+  color: hsl(172, 85%, 65%);
+  border: 1px inline-block solid rgba(255, 255, 255, 0.2);
+  display: inline-block;
+  margin-top: 0.5rem;
+}
+
+/* Real-time Password Strength Meter */
+.strength-meter-container {
+  margin-top: 0.5rem;
+}
+.strength-meter-bar-track {
+  height: 6px;
+  width: 100%;
+  background: rgba(0, 0, 0, 0.08);
+  border-radius: 99px;
+  overflow: hidden;
+}
+body.dark-mode .strength-meter-bar-track {
+  background: rgba(255, 255, 255, 0.1);
+}
+.strength-meter-bar-fill {
+  height: 100%;
+  border-radius: 99px;
+  transition: var(--transition-smooth);
+}
+.strength-weak {
+  width: 33%;
+  background: var(--accent-danger);
+}
+.strength-medium {
+  width: 66%;
+  background: var(--accent-warning);
+}
+.strength-strong {
+  width: 100%;
+  background: var(--accent-success);
+}
+
+.strength-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  display: flex;
+  justify-content: space-between;
+  margin-top: 0.35rem;
+}
+
+/* Forgot Password Link Button */
+.forgot-password-link {
+  font-size: 0.85rem;
+  color: var(--primary);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-weight: 500;
+  transition: var(--transition-fast);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.forgot-password-link:hover {
+  color: var(--primary-hover);
+}
+
+/* Security Badge Card */
+.security-status-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.25rem;
+  background: rgba(142, 70%, 45%, 0.08);
+  border: 1.5px solid rgba(142, 70%, 45%, 0.2);
+  border-radius: var(--radius-md);
+  margin-bottom: 1.5rem;
+}
+body.dark-mode .security-status-card {
+  background: rgba(142, 70%, 45%, 0.15);
+}
+

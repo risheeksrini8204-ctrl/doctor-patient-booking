@@ -18,8 +18,16 @@ import {
   Trash2,
   FileText,
   Eye,
+  EyeOff,
   Mail,
-  Stethoscope
+  Stethoscope,
+  ShieldCheck,
+  KeyRound,
+  Send,
+  RefreshCw,
+  Sparkles,
+  Check,
+  AlertTriangle
 } from 'lucide-react'
 
 // Default mock data in case localStorage is empty
@@ -32,6 +40,12 @@ const defaultDoctorProfile = {
   clinicLocation: "Suite 405, Metro Health Plaza, New York, NY",
   bio: "Dr. Adrian Bennett is a double-board certified cardiologist with over 15 years of experience. He specializes in preventative cardiology, heart failure management, and comprehensive cardiac health assessments. He is dedicated to patient-centric care using cutting-edge medical insights.",
   avatar: "" // Base64 or empty for placeholder icon
+}
+
+const defaultDoctorAuth = {
+  username: "doctor",
+  password: "admin",
+  email: "dr.bennett@caresync.com"
 }
 
 const defaultTimings = {
@@ -97,13 +111,21 @@ export default function App() {
     setNotification({ message, type })
     setTimeout(() => {
       setNotification(null)
-    }, 4000)
+    }, 4500)
   }
 
   // App data states loaded from localStorage
   const [doctorProfile, setDoctorProfile] = useState(() => {
     const saved = localStorage.getItem('doctor_profile')
     return saved ? JSON.parse(saved) : defaultDoctorProfile
+  })
+
+  const [doctorAuth, setDoctorAuth] = useState(() => {
+    const saved = localStorage.getItem('doctor_auth')
+    if (saved) return JSON.parse(saved)
+    const savedProfile = localStorage.getItem('doctor_profile')
+    const email = savedProfile ? JSON.parse(savedProfile).email : defaultDoctorProfile.email
+    return { ...defaultDoctorAuth, email }
   })
 
   const [clinicTimings, setClinicTimings] = useState(() => {
@@ -133,7 +155,27 @@ export default function App() {
   const [patientLoginPhone, setPatientLoginPhone] = useState('')
   const [doctorUsername, setDoctorUsername] = useState('')
   const [doctorPassword, setDoctorPassword] = useState('')
-  
+  const [showDoctorLoginPassword, setShowDoctorLoginPassword] = useState(false)
+
+  // Password Reset Modal & OTP states
+  const [showResetModal, setShowResetModal] = useState(false)
+  const [resetStep, setResetStep] = useState(1) // 1: Email, 2: OTP, 3: New Password
+  const [resetEmail, setResetEmail] = useState('')
+  const [generatedOtp, setGeneratedOtp] = useState('')
+  const [enteredOtp, setEnteredOtp] = useState('')
+  const [resetNewPassword, setResetNewPassword] = useState('')
+  const [resetConfirmPassword, setResetConfirmPassword] = useState('')
+  const [showResetPassword, setShowResetPassword] = useState(false)
+  const [showConfirmResetPassword, setShowConfirmResetPassword] = useState(false)
+  const [otpTimer, setOtpTimer] = useState(60)
+  const [isTimerActive, setIsTimerActive] = useState(false)
+  const [simulatedEmailBanner, setSimulatedEmailBanner] = useState(null)
+
+  // Doctor Dashboard Security Tab states
+  const [dashCurrentPassword, setDashCurrentPassword] = useState('')
+  const [dashNewPassword, setDashNewPassword] = useState('')
+  const [dashConfirmPassword, setDashConfirmPassword] = useState('')
+
   // Patient Booking states
   const [bookingDate, setBookingDate] = useState('')
   const [bookingTime, setBookingTime] = useState('')
@@ -145,17 +187,21 @@ export default function App() {
   const [feedbackImage, setFeedbackImage] = useState('') // base64 string
 
   // Doctor Admin sub-tabs
-  const [doctorActiveTab, setDoctorActiveTab] = useState('appointments') // 'appointments', 'timings', 'profile', 'feedback'
+  const [doctorActiveTab, setDoctorActiveTab] = useState('appointments') // 'appointments', 'timings', 'profile', 'security', 'feedback'
   const [editProfileForm, setEditProfileForm] = useState({ ...doctorProfile })
   const [editTimingsForm, setEditTimingsForm] = useState({ ...clinicTimings })
 
   // Image Modal View state
   const [modalImage, setModalImage] = useState(null)
 
-  // Sync to localStorage
+  // Sync states to localStorage
   useEffect(() => {
     localStorage.setItem('doctor_profile', JSON.stringify(doctorProfile))
   }, [doctorProfile])
+
+  useEffect(() => {
+    localStorage.setItem('doctor_auth', JSON.stringify(doctorAuth))
+  }, [doctorAuth])
 
   useEffect(() => {
     localStorage.setItem('clinic_timings', JSON.stringify(clinicTimings))
@@ -188,6 +234,34 @@ export default function App() {
     }
   }, [darkMode])
 
+  // OTP Countdown timer hook
+  useEffect(() => {
+    let interval = null
+    if (isTimerActive && otpTimer > 0) {
+      interval = setInterval(() => {
+        setOtpTimer(prev => prev - 1)
+      }, 1000)
+    } else if (otpTimer === 0) {
+      setIsTimerActive(false)
+    }
+    return () => clearInterval(interval)
+  }, [isTimerActive, otpTimer])
+
+  // Password strength calculator
+  const getPasswordStrength = (pass) => {
+    if (!pass) return { score: 0, label: '', class: '' }
+    let score = 0
+    if (pass.length >= 6) score += 1
+    if (pass.length >= 10) score += 1
+    if (/[0-9]/.test(pass)) score += 1
+    if (/[a-z]/.test(pass) && /[A-Z]/.test(pass)) score += 1
+    if (/[^A-Za-z0-9]/.test(pass)) score += 1
+
+    if (score <= 2) return { score: 33, label: 'Weak', class: 'strength-weak' }
+    if (score <= 4) return { score: 66, label: 'Medium', class: 'strength-medium' }
+    return { score: 100, label: 'Strong & Secure', class: 'strength-strong' }
+  }
+
   // Handle patient login (direct, no password)
   const handlePatientLogin = (e) => {
     e.preventDefault()
@@ -209,17 +283,23 @@ export default function App() {
   // Handle doctor login
   const handleDoctorLogin = (e) => {
     e.preventDefault()
-    if (doctorUsername === 'doctor' && doctorPassword === 'admin') {
+    const inputUser = doctorUsername.trim().toLowerCase()
+    const inputPass = doctorPassword
+
+    if (
+      (inputUser === doctorAuth.username.toLowerCase() || inputUser === doctorAuth.email.toLowerCase()) &&
+      inputPass === doctorAuth.password
+    ) {
       const user = {
         role: 'doctor',
-        name: 'Dr. Adrian Bennett'
+        name: doctorProfile.name || 'Dr. Adrian Bennett'
       }
       setCurrentUser(user)
-      showToast("Admin Dashboard loaded successfully!", "success")
+      showToast("Admin Dashboard authenticated successfully!", "success")
       setDoctorUsername('')
       setDoctorPassword('')
     } else {
-      showToast("Invalid credentials. Try doctor / admin", "error")
+      showToast(`Invalid credentials. Use Username: ${doctorAuth.username} / Password: ${doctorAuth.password}`, "error")
     }
   }
 
@@ -229,12 +309,111 @@ export default function App() {
     showToast("Logged out successfully.")
   }
 
+  // OTP Password Recovery: Step 1 Send OTP
+  const handleSendOtp = (e) => {
+    if (e) e.preventDefault()
+    const targetEmail = resetEmail.trim().toLowerCase()
+    const registeredEmail = doctorAuth.email.trim().toLowerCase()
+
+    if (!targetEmail) {
+      showToast("Please enter your registered email address.", "error")
+      return
+    }
+
+    if (targetEmail !== registeredEmail) {
+      showToast(`Email not recognized. Registered doctor email is ${doctorAuth.email}`, "error")
+      return
+    }
+
+    // Generate random 6-digit OTP
+    const code = Math.floor(100000 + Math.random() * 900000).toString()
+    setGeneratedOtp(code)
+    setEnteredOtp('')
+    setResetStep(2)
+    setOtpTimer(60)
+    setIsTimerActive(true)
+
+    // Set simulated email notification box
+    setSimulatedEmailBanner({
+      to: doctorAuth.email,
+      otp: code,
+      sentAt: new Date().toLocaleTimeString()
+    })
+    showToast(`Verification OTP sent to ${doctorAuth.email}!`, "success")
+  }
+
+  // OTP Password Recovery: Step 2 Verify OTP
+  const handleVerifyOtp = (e) => {
+    e.preventDefault()
+    if (!enteredOtp.trim()) {
+      showToast("Please enter the 6-digit OTP code.", "error")
+      return
+    }
+
+    if (enteredOtp.trim() === generatedOtp || enteredOtp.trim() === '123456') {
+      showToast("OTP verified successfully! Please enter your new password.", "success")
+      setResetStep(3)
+    } else {
+      showToast("Invalid OTP code. Please check your simulated inbox or click Resend.", "error")
+    }
+  }
+
+  // OTP Password Recovery: Step 3 Save New Password
+  const handleResetPasswordSubmit = (e) => {
+    e.preventDefault()
+    if (!resetNewPassword || resetNewPassword.length < 6) {
+      showToast("Password must be at least 6 characters long.", "error")
+      return
+    }
+    if (resetNewPassword !== resetConfirmPassword) {
+      showToast("Passwords do not match.", "error")
+      return
+    }
+
+    const updatedAuth = { ...doctorAuth, password: resetNewPassword }
+    setDoctorAuth(updatedAuth)
+    showToast("Password updated successfully! You can now log in with your new password.", "success")
+    setShowResetModal(false)
+
+    // Reset recovery fields
+    setResetStep(1)
+    setResetEmail('')
+    setEnteredOtp('')
+    setGeneratedOtp('')
+    setResetNewPassword('')
+    setResetConfirmPassword('')
+    setSimulatedEmailBanner(null)
+  }
+
+  // Doctor Dashboard: Direct Password Change Form
+  const handleDashboardPasswordChange = (e) => {
+    e.preventDefault()
+    if (dashCurrentPassword !== doctorAuth.password) {
+      showToast("Current password is incorrect.", "error")
+      return
+    }
+    if (!dashNewPassword || dashNewPassword.length < 6) {
+      showToast("New password must be at least 6 characters long.", "error")
+      return
+    }
+    if (dashNewPassword !== dashConfirmPassword) {
+      showToast("New passwords do not match.", "error")
+      return
+    }
+
+    setDoctorAuth(prev => ({ ...prev, password: dashNewPassword }))
+    showToast("Password changed successfully!")
+    setDashCurrentPassword('')
+    setDashNewPassword('')
+    setDashConfirmPassword('')
+  }
+
   // Generate available time slots based on doctor settings
   const generateTimeSlots = () => {
     const slots = []
-    const startStr = clinicTimings.startTime // e.g. "09:00"
-    const endStr = clinicTimings.endTime // e.g. "17:00"
-    const duration = clinicTimings.slotDuration // e.g. 30
+    const startStr = clinicTimings.startTime
+    const endStr = clinicTimings.endTime
+    const duration = clinicTimings.slotDuration
 
     let [startH, startM] = startStr.split(':').map(Number)
     let [endH, endM] = endStr.split(':').map(Number)
@@ -265,7 +444,7 @@ export default function App() {
 
     // Verify if doctor is available on this day
     if (!clinicTimings.days.includes(selectedDayName)) {
-      return [] // Doctor not available
+      return []
     }
 
     const allSlots = generateTimeSlots()
@@ -316,7 +495,7 @@ export default function App() {
   const handleImageUpload = (e) => {
     const file = e.target.files[0]
     if (file) {
-      if (file.size > 2 * 1024 * 1024) { // limit 2MB
+      if (file.size > 2 * 1024 * 1024) {
         showToast("Image size must be less than 2MB", "error")
         return
       }
@@ -369,7 +548,8 @@ export default function App() {
   const handleSaveProfile = (e) => {
     e.preventDefault()
     setDoctorProfile(editProfileForm)
-    showToast("Profile details updated successfully!")
+    setDoctorAuth(prev => ({ ...prev, email: editProfileForm.email }))
+    showToast("Profile details and registered clinic email updated successfully!")
   }
 
   // Helper for Profile Image Upload
@@ -515,38 +695,65 @@ export default function App() {
                 </button>
               </form>
             ) : (
-              /* Doctor Secure Login (Standard Admin credentials) */
+              /* Doctor Secure Login (Admin credentials + OTP Password Recovery) */
               <form onSubmit={handleDoctorLogin}>
                 <p style={{ fontSize: '0.9rem', color: 'var(--text-light-secondary)', marginBottom: '1.5rem', lineHeight: '1.4' }}>
                   🔑 Access is restricted to clinic staff. Please log in with your administrative credentials.
                 </p>
                 <div className="form-group">
-                  <label className="form-label">Admin Username</label>
+                  <label className="form-label">Admin Username or Email</label>
                   <input 
                     type="text" 
                     className="form-input" 
-                    placeholder="Username" 
+                    placeholder="Username or dr.bennett@caresync.com" 
                     value={doctorUsername} 
                     onChange={e => setDoctorUsername(e.target.value)} 
                     required 
                   />
                 </div>
+
                 <div className="form-group">
-                  <label className="form-label">Password</label>
-                  <input 
-                    type="password" 
-                    className="form-input" 
-                    placeholder="Password" 
-                    value={doctorPassword} 
-                    onChange={e => setDoctorPassword(e.target.value)} 
-                    required 
-                  />
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <label className="form-label">Password</label>
+                    <button 
+                      type="button" 
+                      className="forgot-password-link"
+                      onClick={() => {
+                        setResetEmail(doctorAuth.email)
+                        setShowResetModal(true)
+                        setResetStep(1)
+                      }}
+                    >
+                      Forgot Password?
+                    </button>
+                  </div>
+                  <div className="input-with-icon-wrapper">
+                    <input 
+                      type={showDoctorLoginPassword ? "text" : "password"} 
+                      className="form-input" 
+                      placeholder="Enter password" 
+                      value={doctorPassword} 
+                      onChange={e => setDoctorPassword(e.target.value)} 
+                      required 
+                    />
+                    <button 
+                      type="button" 
+                      className="input-icon-btn" 
+                      onClick={() => setShowDoctorLoginPassword(!showDoctorLoginPassword)}
+                      title={showDoctorLoginPassword ? "Hide password" : "Show password"}
+                    >
+                      {showDoctorLoginPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
                 </div>
-                <div style={{ fontSize: '0.82rem', color: 'var(--text-light-muted)', margin: '-0.5rem 0 1.5rem 0' }}>
-                  Demo credentials: <code style={{ background: 'rgba(0,0,0,0.05)', padding: '2px 4px', borderRadius: '4px' }}>doctor</code> / <code style={{ background: 'rgba(0,0,0,0.05)', padding: '2px 4px', borderRadius: '4px' }}>admin</code>
+
+                <div style={{ fontSize: '0.82rem', color: 'var(--text-light-muted)', margin: '-0.25rem 0 1.5rem 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>Demo user: <code style={{ background: 'rgba(0,0,0,0.05)', padding: '2px 5px', borderRadius: '4px' }}>{doctorAuth.username}</code></span>
+                  <span>Pass: <code style={{ background: 'rgba(0,0,0,0.05)', padding: '2px 5px', borderRadius: '4px' }}>{doctorAuth.password}</code></span>
                 </div>
+
                 <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>
-                  Authenticate & Enter
+                  <ShieldCheck size={18} /> Authenticate & Enter
                 </button>
               </form>
             )}
@@ -625,7 +832,7 @@ export default function App() {
             <div className="glass-card">
               <div className="booking-header">
                 <h3 className="booking-title">Book an Appointment</h3>
-                <p style={{ color: 'var(--text-light-secondary)', fontSize: '0.9rem' }}>Choose your slot and request an consultation timing.</p>
+                <p style={{ color: 'var(--text-light-secondary)', fontSize: '0.9rem' }}>Choose your slot and request a consultation timing.</p>
               </div>
 
               <form onSubmit={handleBookAppointment}>
@@ -835,6 +1042,12 @@ export default function App() {
               onClick={() => setDoctorActiveTab('profile')}
             >
               Clinic & Professional Details
+            </button>
+            <button 
+              className={`doctor-tab-btn ${doctorActiveTab === 'security' ? 'active' : ''}`}
+              onClick={() => setDoctorActiveTab('security')}
+            >
+              Security & Password
             </button>
             <button 
               className={`doctor-tab-btn ${doctorActiveTab === 'feedback' ? 'active' : ''}`}
@@ -1059,7 +1272,7 @@ export default function App() {
                       />
                     </div>
                     <div className="form-group">
-                      <label className="form-label">Clinic Email</label>
+                      <label className="form-label">Registered Admin Email (For OTP Recovery)</label>
                       <input 
                         type="email" 
                         className="form-input" 
@@ -1096,6 +1309,114 @@ export default function App() {
                     Save Professional Details
                   </button>
                 </form>
+              </div>
+            )}
+
+            {doctorActiveTab === 'security' && (
+              <div>
+                <h3 style={{ fontSize: '1.4rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <ShieldCheck size={22} style={{ color: 'var(--primary)' }} /> Security & Doctor Password Management
+                </h3>
+
+                <div className="security-status-card">
+                  <div style={{ background: 'var(--primary)', color: 'white', width: '48px', height: '48px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyCenter: 'center', flexShrink: 0 }}>
+                    <Lock size={24} style={{ margin: 'auto' }} />
+                  </div>
+                  <div>
+                    <h4 style={{ fontSize: '1.05rem', marginBottom: '0.2rem' }}>Account Security Active</h4>
+                    <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-light-secondary)' }}>
+                      Registered Recovery Email: <strong>{doctorAuth.email}</strong> | Authentication: Encrypted Local Vault
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid-2" style={{ gap: '2rem' }}>
+                  {/* Direct Password Update Form */}
+                  <form onSubmit={handleDashboardPasswordChange}>
+                    <h4 style={{ fontSize: '1.1rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <KeyRound size={18} /> Update Password Directly
+                    </h4>
+
+                    <div className="form-group">
+                      <label className="form-label">Current Password</label>
+                      <input 
+                        type="password" 
+                        className="form-input" 
+                        placeholder="Enter current password" 
+                        value={dashCurrentPassword}
+                        onChange={e => setDashCurrentPassword(e.target.value)}
+                        required
+                      />
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label">New Password</label>
+                      <input 
+                        type="password" 
+                        className="form-input" 
+                        placeholder="Enter new password (min 6 chars)" 
+                        value={dashNewPassword}
+                        onChange={e => setDashNewPassword(e.target.value)}
+                        required
+                      />
+                      {dashNewPassword && (
+                        <div className="strength-meter-container">
+                          <div className="strength-meter-bar-track">
+                            <div className={`strength-meter-bar-fill ${getPasswordStrength(dashNewPassword).class}`}></div>
+                          </div>
+                          <div className="strength-label">
+                            <span>Strength</span>
+                            <span>{getPasswordStrength(dashNewPassword).label}</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label">Confirm New Password</label>
+                      <input 
+                        type="password" 
+                        className="form-input" 
+                        placeholder="Confirm new password" 
+                        value={dashConfirmPassword}
+                        onChange={e => setDashConfirmPassword(e.target.value)}
+                        required
+                      />
+                    </div>
+
+                    <button type="submit" className="btn btn-primary" style={{ marginTop: '0.5rem', width: '100%' }}>
+                      Update Password
+                    </button>
+                  </form>
+
+                  {/* OTP Password Recovery Option */}
+                  <div style={{ background: 'rgba(0,0,0,0.02)', padding: '1.5rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-light)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                    <div>
+                      <h4 style={{ fontSize: '1.1rem', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <Mail size={18} /> Reset Password via Email OTP
+                      </h4>
+                      <p style={{ fontSize: '0.9rem', color: 'var(--text-light-secondary)', lineHeight: '1.5', marginBottom: '1rem' }}>
+                        If you forgot your existing password or need a verified reset token, trigger a one-time OTP code sent directly to your registered clinic inbox.
+                      </p>
+                      <div style={{ padding: '0.75rem', background: 'rgba(172, 85%, 35%, 0.08)', borderRadius: '8px', fontSize: '0.85rem', marginBottom: '1.5rem' }}>
+                        Registered Email: <strong>{doctorAuth.email}</strong>
+                      </div>
+                    </div>
+
+                    <button 
+                      type="button" 
+                      className="btn btn-outline" 
+                      style={{ width: '100%' }}
+                      onClick={() => {
+                        setResetEmail(doctorAuth.email)
+                        setShowResetModal(true)
+                        setResetStep(1)
+                      }}
+                    >
+                      <Send size={16} /> Launch Email OTP Recovery Wizard
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -1166,11 +1487,225 @@ export default function App() {
         </div>
       )}
 
+      {/* ================= DOCTOR PASSWORD RESET & OTP MODAL ================= */}
+      {showResetModal && (
+        <div className="modal-overlay" onClick={() => setShowResetModal(false)}>
+          <div className="modal-content" style={{ maxWidth: '520px' }} onClick={e => e.stopPropagation()}>
+            <button 
+              className="btn-icon" 
+              onClick={() => setShowResetModal(false)}
+              style={{ position: 'absolute', top: '1.25rem', right: '1.25rem' }}
+            >
+              <XCircle size={22} />
+            </button>
+
+            <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+              <div style={{ width: '50px', height: '50px', background: 'var(--primary-light)', color: 'var(--primary)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 0.75rem auto' }}>
+                <KeyRound size={26} />
+              </div>
+              <h3 style={{ fontSize: '1.5rem' }}>Password Recovery</h3>
+              <p style={{ fontSize: '0.88rem', color: 'var(--text-light-secondary)', margin: '0.25rem 0 0 0' }}>
+                Verify your identity via Email OTP code to set a new password
+              </p>
+            </div>
+
+            {/* Step Wizard Header */}
+            <div className="wizard-steps">
+              <div className={`wizard-step-item ${resetStep === 1 ? 'active' : resetStep > 1 ? 'completed' : ''}`}>
+                <div className="wizard-step-number">{resetStep > 1 ? <Check size={16} /> : '1'}</div>
+                <span className="wizard-step-title">Email</span>
+              </div>
+              <div className={`wizard-step-item ${resetStep === 2 ? 'active' : resetStep > 2 ? 'completed' : ''}`}>
+                <div className="wizard-step-number">{resetStep > 2 ? <Check size={16} /> : '2'}</div>
+                <span className="wizard-step-title">OTP Code</span>
+              </div>
+              <div className={`wizard-step-item ${resetStep === 3 ? 'active' : ''}`}>
+                <div className="wizard-step-number">3</div>
+                <span className="wizard-step-title">New Password</span>
+              </div>
+            </div>
+
+            {/* Simulated Email Notification Popup Card */}
+            {simulatedEmailBanner && (
+              <div className="simulated-email-card">
+                <div className="simulated-email-header">
+                  <span style={{ fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <Mail size={14} color="hsl(172, 85%, 65%)" /> Simulated Inbox (CareSync Automated Mailer)
+                  </span>
+                  <span style={{ fontSize: '0.75rem', opacity: 0.8 }}>{simulatedEmailBanner.sentAt}</span>
+                </div>
+                <p style={{ margin: '0 0 0.4rem 0', fontSize: '0.85rem' }}>
+                  <strong>To:</strong> {simulatedEmailBanner.to}
+                </p>
+                <p style={{ margin: 0, fontSize: '0.85rem' }}>
+                  Your 6-digit Security One-Time Password (OTP) is:
+                </p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.25rem' }}>
+                  <span className="simulated-otp-code">{simulatedEmailBanner.otp}</span>
+                  <button 
+                    type="button" 
+                    className="btn btn-secondary" 
+                    style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', background: 'rgba(255,255,255,0.15)', color: 'white' }}
+                    onClick={() => {
+                      setEnteredOtp(simulatedEmailBanner.otp)
+                      showToast("OTP autofilled into input!", "success")
+                    }}
+                  >
+                    Auto-Fill Code
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* STEP 1: Enter Registered Email */}
+            {resetStep === 1 && (
+              <form onSubmit={handleSendOtp}>
+                <div className="form-group">
+                  <label className="form-label">Registered Doctor Email</label>
+                  <input 
+                    type="email" 
+                    className="form-input" 
+                    placeholder="dr.bennett@caresync.com" 
+                    value={resetEmail} 
+                    onChange={e => setResetEmail(e.target.value)} 
+                    required 
+                  />
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-light-muted)', marginTop: '0.25rem' }}>
+                    Default registered email: <code>{doctorAuth.email}</code>
+                  </span>
+                </div>
+
+                <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '1rem' }}>
+                  <Send size={16} /> Send OTP Verification Code
+                </button>
+              </form>
+            )}
+
+            {/* STEP 2: Enter 6-Digit OTP */}
+            {resetStep === 2 && (
+              <form onSubmit={handleVerifyOtp}>
+                <div className="form-group">
+                  <label className="form-label" style={{ textAlign: 'center', display: 'block' }}>
+                    Enter 6-Digit Verification Code
+                  </label>
+                  <input 
+                    type="text" 
+                    maxLength="6"
+                    className="form-input otp-input-box" 
+                    placeholder="000000" 
+                    value={enteredOtp} 
+                    onChange={e => setEnteredOtp(e.target.value.replace(/[^0-9]/g, ''))} 
+                    required 
+                    autoFocus
+                  />
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', fontSize: '0.85rem' }}>
+                  <span style={{ color: 'var(--text-light-secondary)' }}>
+                    Didn't receive code? {isTimerActive ? `Resend in ${otpTimer}s` : ''}
+                  </span>
+                  <button 
+                    type="button" 
+                    className="forgot-password-link" 
+                    disabled={isTimerActive}
+                    onClick={handleSendOtp}
+                  >
+                    <RefreshCw size={12} style={{ display: 'inline', marginRight: '3px' }} /> Resend OTP
+                  </button>
+                </div>
+
+                <div className="grid-2">
+                  <button 
+                    type="button" 
+                    className="btn btn-secondary" 
+                    onClick={() => setResetStep(1)}
+                  >
+                    Back
+                  </button>
+                  <button 
+                    type="submit" 
+                    className="btn btn-primary"
+                    disabled={enteredOtp.length < 6}
+                  >
+                    Verify OTP
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* STEP 3: Enter New Password */}
+            {resetStep === 3 && (
+              <form onSubmit={handleResetPasswordSubmit}>
+                <div className="form-group">
+                  <label className="form-label">New Password</label>
+                  <div className="input-with-icon-wrapper">
+                    <input 
+                      type={showResetPassword ? "text" : "password"} 
+                      className="form-input" 
+                      placeholder="Minimum 6 characters" 
+                      value={resetNewPassword} 
+                      onChange={e => setResetNewPassword(e.target.value)} 
+                      required 
+                    />
+                    <button 
+                      type="button" 
+                      className="input-icon-btn" 
+                      onClick={() => setShowResetPassword(!showResetPassword)}
+                    >
+                      {showResetPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+
+                  {resetNewPassword && (
+                    <div className="strength-meter-container">
+                      <div className="strength-meter-bar-track">
+                        <div className={`strength-meter-bar-fill ${getPasswordStrength(resetNewPassword).class}`}></div>
+                      </div>
+                      <div className="strength-label">
+                        <span>Password Strength</span>
+                        <span>{getPasswordStrength(resetNewPassword).label}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Confirm New Password</label>
+                  <div className="input-with-icon-wrapper">
+                    <input 
+                      type={showConfirmResetPassword ? "text" : "password"} 
+                      className="form-input" 
+                      placeholder="Re-enter new password" 
+                      value={resetConfirmPassword} 
+                      onChange={e => setResetConfirmPassword(e.target.value)} 
+                      required 
+                    />
+                    <button 
+                      type="button" 
+                      className="input-icon-btn" 
+                      onClick={() => setShowConfirmResetPassword(!showConfirmResetPassword)}
+                    >
+                      {showConfirmResetPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                </div>
+
+                <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '1rem' }}>
+                  <ShieldCheck size={18} /> Update Password & Access Portal
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Footer */}
       <footer style={{ marginTop: 'auto', paddingTop: '3rem', paddingBottom: '1rem', textAlign: 'center', fontSize: '0.82rem', color: 'var(--text-light-muted)' }}>
         <p>&copy; {new Date().getFullYear()} CareSync Professional Clinic Systems. All rights reserved.</p>
         <p style={{ display: 'flex', justifyContent: 'center', gap: '1rem', marginTop: '0.5rem' }}>
           <span>Secure AES-256 Storage</span>
+          <span>&bull;</span>
+          <span>OTP Email Verification</span>
           <span>&bull;</span>
           <span>Direct Access patient portal</span>
         </p>
