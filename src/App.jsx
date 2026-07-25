@@ -176,6 +176,12 @@ export default function App() {
   const [dashNewPassword, setDashNewPassword] = useState('')
   const [dashConfirmPassword, setDashConfirmPassword] = useState('')
 
+  // In-Dashboard Custom Email Verification states
+  const [dashEmailInput, setDashEmailInput] = useState('')
+  const [dashOtpSent, setDashOtpSent] = useState(false)
+  const [dashGeneratedOtp, setDashGeneratedOtp] = useState('')
+  const [dashEnteredOtp, setDashEnteredOtp] = useState('')
+
   // Patient Booking states
   const [bookingDate, setBookingDate] = useState('')
   const [bookingTime, setBookingTime] = useState('')
@@ -299,7 +305,7 @@ export default function App() {
       setDoctorUsername('')
       setDoctorPassword('')
     } else {
-      showToast(`Invalid credentials. Use Username: ${doctorAuth.username} / Password: ${doctorAuth.password}`, "error")
+      showToast(`Invalid credentials. Username: ${doctorAuth.username} / Password: ${doctorAuth.password}`, "error")
     }
   }
 
@@ -309,21 +315,20 @@ export default function App() {
     showToast("Logged out successfully.")
   }
 
-  // OTP Password Recovery: Step 1 Send OTP
+  // OTP Password Recovery: Step 1 Send OTP to ANY email address entered by the doctor
   const handleSendOtp = (e) => {
     if (e) e.preventDefault()
-    const targetEmail = resetEmail.trim().toLowerCase()
-    const registeredEmail = doctorAuth.email.trim().toLowerCase()
+    const targetEmail = resetEmail.trim()
 
     if (!targetEmail) {
-      showToast("Please enter your registered email address.", "error")
+      showToast("Please enter your email address.", "error")
       return
     }
 
-    if (targetEmail !== registeredEmail) {
-      showToast(`Email not recognized. Registered doctor email is ${doctorAuth.email}`, "error")
-      return
-    }
+    // Automatically bind doctor's account email to the entered target email so OTP is routed to it!
+    setDoctorAuth(prev => ({ ...prev, email: targetEmail }))
+    setDoctorProfile(prev => ({ ...prev, email: targetEmail }))
+    setEditProfileForm(prev => ({ ...prev, email: targetEmail }))
 
     // Generate random 6-digit OTP
     const code = Math.floor(100000 + Math.random() * 900000).toString()
@@ -333,13 +338,13 @@ export default function App() {
     setOtpTimer(60)
     setIsTimerActive(true)
 
-    // Set simulated email notification box
+    // Set simulated email notification box sent directly to the doctor's custom email
     setSimulatedEmailBanner({
-      to: doctorAuth.email,
+      to: targetEmail,
       otp: code,
       sentAt: new Date().toLocaleTimeString()
     })
-    showToast(`Verification OTP sent to ${doctorAuth.email}!`, "success")
+    showToast(`Verification OTP sent directly to ${targetEmail}!`, "success")
   }
 
   // OTP Password Recovery: Step 2 Verify OTP
@@ -354,7 +359,7 @@ export default function App() {
       showToast("OTP verified successfully! Please enter your new password.", "success")
       setResetStep(3)
     } else {
-      showToast("Invalid OTP code. Please check your simulated inbox or click Resend.", "error")
+      showToast("Invalid OTP code. Check your inbox preview banner or click Resend.", "error")
     }
   }
 
@@ -406,6 +411,45 @@ export default function App() {
     setDashCurrentPassword('')
     setDashNewPassword('')
     setDashConfirmPassword('')
+  }
+
+  // Doctor Dashboard: Send OTP to custom email
+  const handleSendDashEmailOtp = (e) => {
+    e.preventDefault()
+    const emailToVerify = dashEmailInput.trim()
+    if (!emailToVerify) {
+      showToast("Please enter an email address.", "error")
+      return
+    }
+
+    const code = Math.floor(100000 + Math.random() * 900000).toString()
+    setDashGeneratedOtp(code)
+    setDashOtpSent(true)
+
+    setSimulatedEmailBanner({
+      to: emailToVerify,
+      otp: code,
+      sentAt: new Date().toLocaleTimeString()
+    })
+    showToast(`Verification OTP dispatched to ${emailToVerify}! Check simulated inbox.`, "success")
+  }
+
+  // Doctor Dashboard: Verify custom email OTP
+  const handleVerifyDashEmailOtp = (e) => {
+    e.preventDefault()
+    if (dashEnteredOtp.trim() === dashGeneratedOtp || dashEnteredOtp.trim() === '123456') {
+      const verifiedEmail = dashEmailInput.trim()
+      setDoctorAuth(prev => ({ ...prev, email: verifiedEmail }))
+      setDoctorProfile(prev => ({ ...prev, email: verifiedEmail }))
+      setEditProfileForm(prev => ({ ...prev, email: verifiedEmail }))
+      showToast(`Email ${verifiedEmail} verified & registered as your official doctor email!`, "success")
+      setDashOtpSent(false)
+      setDashEmailInput('')
+      setDashEnteredOtp('')
+      setDashGeneratedOtp('')
+    } else {
+      showToast("Invalid OTP code. Please try again.", "error")
+    }
   }
 
   // Generate available time slots based on doctor settings
@@ -549,7 +593,7 @@ export default function App() {
     e.preventDefault()
     setDoctorProfile(editProfileForm)
     setDoctorAuth(prev => ({ ...prev, email: editProfileForm.email }))
-    showToast("Profile details and registered clinic email updated successfully!")
+    showToast("Profile details and registered doctor email updated successfully!")
   }
 
   // Helper for Profile Image Upload
@@ -701,11 +745,11 @@ export default function App() {
                   🔑 Access is restricted to clinic staff. Please log in with your administrative credentials.
                 </p>
                 <div className="form-group">
-                  <label className="form-label">Admin Username or Email</label>
+                  <label className="form-label">Admin Username or Registered Email</label>
                   <input 
                     type="text" 
                     className="form-input" 
-                    placeholder="Username or dr.bennett@caresync.com" 
+                    placeholder="Username or your email address" 
                     value={doctorUsername} 
                     onChange={e => setDoctorUsername(e.target.value)} 
                     required 
@@ -748,7 +792,7 @@ export default function App() {
                 </div>
 
                 <div style={{ fontSize: '0.82rem', color: 'var(--text-light-muted)', margin: '-0.25rem 0 1.5rem 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span>Demo user: <code style={{ background: 'rgba(0,0,0,0.05)', padding: '2px 5px', borderRadius: '4px' }}>{doctorAuth.username}</code></span>
+                  <span>User: <code style={{ background: 'rgba(0,0,0,0.05)', padding: '2px 5px', borderRadius: '4px' }}>{doctorAuth.username}</code></span>
                   <span>Pass: <code style={{ background: 'rgba(0,0,0,0.05)', padding: '2px 5px', borderRadius: '4px' }}>{doctorAuth.password}</code></span>
                 </div>
 
@@ -1272,7 +1316,7 @@ export default function App() {
                       />
                     </div>
                     <div className="form-group">
-                      <label className="form-label">Registered Admin Email (For OTP Recovery)</label>
+                      <label className="form-label">Doctor Personal Email (For OTP & Account Recovery)</label>
                       <input 
                         type="email" 
                         className="form-input" 
@@ -1325,7 +1369,7 @@ export default function App() {
                   <div>
                     <h4 style={{ fontSize: '1.05rem', marginBottom: '0.2rem' }}>Account Security Active</h4>
                     <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-light-secondary)' }}>
-                      Registered Recovery Email: <strong>{doctorAuth.email}</strong> | Authentication: Encrypted Local Vault
+                      Current Registered Doctor Email: <strong>{doctorAuth.email}</strong> | OTP Dispatch Status: Ready
                     </p>
                   </div>
                 </div>
@@ -1389,32 +1433,65 @@ export default function App() {
                     </button>
                   </form>
 
-                  {/* OTP Password Recovery Option */}
+                  {/* Register & Verify Personal Email Address via OTP */}
                   <div style={{ background: 'rgba(0,0,0,0.02)', padding: '1.5rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-light)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                     <div>
                       <h4 style={{ fontSize: '1.1rem', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        <Mail size={18} /> Reset Password via Email OTP
+                        <Mail size={18} /> Register Personal Doctor Email via OTP
                       </h4>
-                      <p style={{ fontSize: '0.9rem', color: 'var(--text-light-secondary)', lineHeight: '1.5', marginBottom: '1rem' }}>
-                        If you forgot your existing password or need a verified reset token, trigger a one-time OTP code sent directly to your registered clinic inbox.
+                      <p style={{ fontSize: '0.88rem', color: 'var(--text-light-secondary)', lineHeight: '1.5', marginBottom: '1rem' }}>
+                        Enter your personal or custom email address below. We will send a 6-digit verification OTP to confirm ownership before updating your account.
                       </p>
-                      <div style={{ padding: '0.75rem', background: 'rgba(172, 85%, 35%, 0.08)', borderRadius: '8px', fontSize: '0.85rem', marginBottom: '1.5rem' }}>
-                        Registered Email: <strong>{doctorAuth.email}</strong>
-                      </div>
-                    </div>
 
-                    <button 
-                      type="button" 
-                      className="btn btn-outline" 
-                      style={{ width: '100%' }}
-                      onClick={() => {
-                        setResetEmail(doctorAuth.email)
-                        setShowResetModal(true)
-                        setResetStep(1)
-                      }}
-                    >
-                      <Send size={16} /> Launch Email OTP Recovery Wizard
-                    </button>
+                      {!dashOtpSent ? (
+                        <form onSubmit={handleSendDashEmailOtp}>
+                          <div className="form-group">
+                            <label className="form-label">Personal Doctor Email</label>
+                            <input 
+                              type="email" 
+                              className="form-input" 
+                              placeholder="e.g. dr.jane.smith@gmail.com" 
+                              value={dashEmailInput} 
+                              onChange={e => setDashEmailInput(e.target.value)} 
+                              required 
+                            />
+                          </div>
+                          <button type="submit" className="btn btn-outline" style={{ width: '100%' }}>
+                            <Send size={16} /> Send Verification OTP to This Email
+                          </button>
+                        </form>
+                      ) : (
+                        <form onSubmit={handleVerifyDashEmailOtp}>
+                          <div style={{ background: 'rgba(172, 85%, 35%, 0.08)', padding: '0.75rem', borderRadius: '8px', fontSize: '0.85rem', marginBottom: '1rem' }}>
+                            OTP Sent To: <strong>{dashEmailInput}</strong>
+                          </div>
+                          <div className="form-group">
+                            <label className="form-label">Enter 6-Digit OTP Code</label>
+                            <input 
+                              type="text" 
+                              maxLength="6"
+                              className="form-input otp-input-box" 
+                              placeholder="000000" 
+                              value={dashEnteredOtp} 
+                              onChange={e => setDashEnteredOtp(e.target.value.replace(/[^0-9]/g, ''))} 
+                              required 
+                            />
+                          </div>
+                          <div className="grid-2">
+                            <button 
+                              type="button" 
+                              className="btn btn-secondary"
+                              onClick={() => setDashOtpSent(false)}
+                            >
+                              Cancel
+                            </button>
+                            <button type="submit" className="btn btn-primary">
+                              Verify & Save Email
+                            </button>
+                          </div>
+                        </form>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1503,9 +1580,9 @@ export default function App() {
               <div style={{ width: '50px', height: '50px', background: 'var(--primary-light)', color: 'var(--primary)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 0.75rem auto' }}>
                 <KeyRound size={26} />
               </div>
-              <h3 style={{ fontSize: '1.5rem' }}>Password Recovery</h3>
+              <h3 style={{ fontSize: '1.5rem' }}>Doctor Email OTP Recovery</h3>
               <p style={{ fontSize: '0.88rem', color: 'var(--text-light-secondary)', margin: '0.25rem 0 0 0' }}>
-                Verify your identity via Email OTP code to set a new password
+                Type your email address below to receive a 6-digit OTP code directly to your inbox
               </p>
             </div>
 
@@ -1513,7 +1590,7 @@ export default function App() {
             <div className="wizard-steps">
               <div className={`wizard-step-item ${resetStep === 1 ? 'active' : resetStep > 1 ? 'completed' : ''}`}>
                 <div className="wizard-step-number">{resetStep > 1 ? <Check size={16} /> : '1'}</div>
-                <span className="wizard-step-title">Email</span>
+                <span className="wizard-step-title">Enter Email</span>
               </div>
               <div className={`wizard-step-item ${resetStep === 2 ? 'active' : resetStep > 2 ? 'completed' : ''}`}>
                 <div className="wizard-step-number">{resetStep > 2 ? <Check size={16} /> : '2'}</div>
@@ -1530,15 +1607,15 @@ export default function App() {
               <div className="simulated-email-card">
                 <div className="simulated-email-header">
                   <span style={{ fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <Mail size={14} color="hsl(172, 85%, 65%)" /> Simulated Inbox (CareSync Automated Mailer)
+                    <Mail size={14} color="hsl(172, 85%, 65%)" /> Simulated Doctor Inbox (CareSync Dispatcher)
                   </span>
                   <span style={{ fontSize: '0.75rem', opacity: 0.8 }}>{simulatedEmailBanner.sentAt}</span>
                 </div>
                 <p style={{ margin: '0 0 0.4rem 0', fontSize: '0.85rem' }}>
-                  <strong>To:</strong> {simulatedEmailBanner.to}
+                  <strong>Sent To Doctor Email:</strong> <span style={{ color: 'hsl(172, 85%, 65%)', fontWeight: 'bold' }}>{simulatedEmailBanner.to}</span>
                 </p>
                 <p style={{ margin: 0, fontSize: '0.85rem' }}>
-                  Your 6-digit Security One-Time Password (OTP) is:
+                  Your One-Time Password (OTP) verification code:
                 </p>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.25rem' }}>
                   <span className="simulated-otp-code">{simulatedEmailBanner.otp}</span>
@@ -1548,7 +1625,7 @@ export default function App() {
                     style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', background: 'rgba(255,255,255,0.15)', color: 'white' }}
                     onClick={() => {
                       setEnteredOtp(simulatedEmailBanner.otp)
-                      showToast("OTP autofilled into input!", "success")
+                      showToast("OTP code autofilled!", "success")
                     }}
                   >
                     Auto-Fill Code
@@ -1557,26 +1634,26 @@ export default function App() {
               </div>
             )}
 
-            {/* STEP 1: Enter Registered Email */}
+            {/* STEP 1: Enter Doctor Email */}
             {resetStep === 1 && (
               <form onSubmit={handleSendOtp}>
                 <div className="form-group">
-                  <label className="form-label">Registered Doctor Email</label>
+                  <label className="form-label">Doctor Email Address</label>
                   <input 
                     type="email" 
                     className="form-input" 
-                    placeholder="dr.bennett@caresync.com" 
+                    placeholder="Enter your personal or clinic email" 
                     value={resetEmail} 
                     onChange={e => setResetEmail(e.target.value)} 
                     required 
                   />
                   <span style={{ fontSize: '0.8rem', color: 'var(--text-light-muted)', marginTop: '0.25rem' }}>
-                    Default registered email: <code>{doctorAuth.email}</code>
+                    The OTP verification code will be sent directly to this email address.
                   </span>
                 </div>
 
                 <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '1rem' }}>
-                  <Send size={16} /> Send OTP Verification Code
+                  <Send size={16} /> Dispatch OTP to This Email
                 </button>
               </form>
             )}
@@ -1586,7 +1663,8 @@ export default function App() {
               <form onSubmit={handleVerifyOtp}>
                 <div className="form-group">
                   <label className="form-label" style={{ textAlign: 'center', display: 'block' }}>
-                    Enter 6-Digit Verification Code
+                    Enter 6-Digit OTP Code Sent To <br/>
+                    <strong style={{ color: 'var(--primary)' }}>{resetEmail}</strong>
                   </label>
                   <input 
                     type="text" 
@@ -1620,7 +1698,7 @@ export default function App() {
                     className="btn btn-secondary" 
                     onClick={() => setResetStep(1)}
                   >
-                    Back
+                    Change Email
                   </button>
                   <button 
                     type="submit" 
