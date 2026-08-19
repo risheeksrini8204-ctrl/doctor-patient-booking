@@ -27,7 +27,10 @@ import {
   RefreshCw,
   Sparkles,
   Check,
-  AlertTriangle
+  AlertTriangle,
+  Smartphone,
+  MessageSquare,
+  Shield
 } from 'lucide-react'
 
 // Default mock data in case localStorage is empty
@@ -45,7 +48,8 @@ const defaultDoctorProfile = {
 const defaultDoctorAuth = {
   username: "doctor",
   password: "admin",
-  email: "dr.bennett@caresync.com"
+  email: "dr.bennett@caresync.com",
+  phone: "+1 (555) 839-2001"
 }
 
 const defaultTimings = {
@@ -125,7 +129,8 @@ export default function App() {
     if (saved) return JSON.parse(saved)
     const savedProfile = localStorage.getItem('doctor_profile')
     const email = savedProfile ? JSON.parse(savedProfile).email : defaultDoctorProfile.email
-    return { ...defaultDoctorAuth, email }
+    const phone = savedProfile ? JSON.parse(savedProfile).phone : defaultDoctorProfile.phone
+    return { ...defaultDoctorAuth, email, phone }
   })
 
   const [clinicTimings, setClinicTimings] = useState(() => {
@@ -159,8 +164,10 @@ export default function App() {
 
   // Password Reset Modal & OTP states
   const [showResetModal, setShowResetModal] = useState(false)
-  const [resetStep, setResetStep] = useState(1) // 1: Email, 2: OTP, 3: New Password
+  const [resetChannel, setResetChannel] = useState('mobile') // 'mobile' or 'email'
+  const [resetStep, setResetStep] = useState(1) // 1: Target, 2: OTP, 3: New Password
   const [resetEmail, setResetEmail] = useState('')
+  const [resetPhone, setResetPhone] = useState('')
   const [generatedOtp, setGeneratedOtp] = useState('')
   const [enteredOtp, setEnteredOtp] = useState('')
   const [resetNewPassword, setResetNewPassword] = useState('')
@@ -170,17 +177,21 @@ export default function App() {
   const [otpTimer, setOtpTimer] = useState(60)
   const [isTimerActive, setIsTimerActive] = useState(false)
   const [simulatedEmailBanner, setSimulatedEmailBanner] = useState(null)
+  const [simulatedSmsBanner, setSimulatedSmsBanner] = useState(null)
 
-  // Doctor Dashboard Security Tab states
+  // Doctor Dashboard Security Tab & Password Change with Mobile OTP states
   const [dashCurrentPassword, setDashCurrentPassword] = useState('')
   const [dashNewPassword, setDashNewPassword] = useState('')
   const [dashConfirmPassword, setDashConfirmPassword] = useState('')
+  const [dashPasswordOtpSent, setDashPasswordOtpSent] = useState(false)
+  const [dashPasswordGenOtp, setDashPasswordGenOtp] = useState('')
+  const [dashPasswordEnteredOtp, setDashPasswordEnteredOtp] = useState('')
 
-  // In-Dashboard Custom Email Verification states
-  const [dashEmailInput, setDashEmailInput] = useState('')
-  const [dashOtpSent, setDashOtpSent] = useState(false)
-  const [dashGeneratedOtp, setDashGeneratedOtp] = useState('')
-  const [dashEnteredOtp, setDashEnteredOtp] = useState('')
+  // In-Dashboard Custom Phone / Email Verification states
+  const [dashPhoneInput, setDashPhoneInput] = useState('')
+  const [dashPhoneOtpSent, setDashPhoneOtpSent] = useState(false)
+  const [dashPhoneGenOtp, setDashPhoneGenOtp] = useState('')
+  const [dashPhoneEnteredOtp, setDashPhoneEnteredOtp] = useState('')
 
   // Patient Booking states
   const [bookingDate, setBookingDate] = useState('')
@@ -293,7 +304,9 @@ export default function App() {
     const inputPass = doctorPassword
 
     if (
-      (inputUser === doctorAuth.username.toLowerCase() || inputUser === doctorAuth.email.toLowerCase()) &&
+      (inputUser === doctorAuth.username.toLowerCase() || 
+       inputUser === doctorAuth.email.toLowerCase() || 
+       inputUser === doctorAuth.phone.toLowerCase()) &&
       inputPass === doctorAuth.password
     ) {
       const user = {
@@ -315,22 +328,9 @@ export default function App() {
     showToast("Logged out successfully.")
   }
 
-  // OTP Password Recovery: Step 1 Send OTP to ANY email address entered by the doctor
+  // OTP Password Recovery: Step 1 Send OTP (Mobile SMS or Email)
   const handleSendOtp = (e) => {
     if (e) e.preventDefault()
-    const targetEmail = resetEmail.trim()
-
-    if (!targetEmail) {
-      showToast("Please enter your email address.", "error")
-      return
-    }
-
-    // Automatically bind doctor's account email to the entered target email so OTP is routed to it!
-    setDoctorAuth(prev => ({ ...prev, email: targetEmail }))
-    setDoctorProfile(prev => ({ ...prev, email: targetEmail }))
-    setEditProfileForm(prev => ({ ...prev, email: targetEmail }))
-
-    // Generate random 6-digit OTP
     const code = Math.floor(100000 + Math.random() * 900000).toString()
     setGeneratedOtp(code)
     setEnteredOtp('')
@@ -338,13 +338,31 @@ export default function App() {
     setOtpTimer(60)
     setIsTimerActive(true)
 
-    // Set simulated email notification box sent directly to the doctor's custom email
-    setSimulatedEmailBanner({
-      to: targetEmail,
-      otp: code,
-      sentAt: new Date().toLocaleTimeString()
-    })
-    showToast(`Verification OTP sent directly to ${targetEmail}!`, "success")
+    if (resetChannel === 'mobile') {
+      const targetPhone = resetPhone.trim() || doctorAuth.phone
+      setDoctorAuth(prev => ({ ...prev, phone: targetPhone }))
+      setDoctorProfile(prev => ({ ...prev, phone: targetPhone }))
+      setEditProfileForm(prev => ({ ...prev, phone: targetPhone }))
+
+      setSimulatedSmsBanner({
+        phone: targetPhone,
+        otp: code,
+        sentAt: new Date().toLocaleTimeString()
+      })
+      showToast(`Mobile SMS OTP sent directly to registered phone ${targetPhone}!`, "success")
+    } else {
+      const targetEmail = resetEmail.trim() || doctorAuth.email
+      setDoctorAuth(prev => ({ ...prev, email: targetEmail }))
+      setDoctorProfile(prev => ({ ...prev, email: targetEmail }))
+      setEditProfileForm(prev => ({ ...prev, email: targetEmail }))
+
+      setSimulatedEmailBanner({
+        to: targetEmail,
+        otp: code,
+        sentAt: new Date().toLocaleTimeString()
+      })
+      showToast(`Verification OTP sent directly to ${targetEmail}!`, "success")
+    }
   }
 
   // OTP Password Recovery: Step 2 Verify OTP
@@ -359,7 +377,7 @@ export default function App() {
       showToast("OTP verified successfully! Please enter your new password.", "success")
       setResetStep(3)
     } else {
-      showToast("Invalid OTP code. Check your inbox preview banner or click Resend.", "error")
+      showToast("Invalid OTP code. Check your simulated SMS/Email banner or click Resend.", "error")
     }
   }
 
@@ -383,15 +401,17 @@ export default function App() {
     // Reset recovery fields
     setResetStep(1)
     setResetEmail('')
+    setResetPhone('')
     setEnteredOtp('')
     setGeneratedOtp('')
     setResetNewPassword('')
     setResetConfirmPassword('')
     setSimulatedEmailBanner(null)
+    setSimulatedSmsBanner(null)
   }
 
-  // Doctor Dashboard: Direct Password Change Form
-  const handleDashboardPasswordChange = (e) => {
+  // Doctor Dashboard: Request Mobile SMS OTP for Changing Password
+  const handleRequestDashboardPasswordOtp = (e) => {
     e.preventDefault()
     if (dashCurrentPassword !== doctorAuth.password) {
       showToast("Current password is incorrect.", "error")
@@ -406,49 +426,74 @@ export default function App() {
       return
     }
 
-    setDoctorAuth(prev => ({ ...prev, password: dashNewPassword }))
-    showToast("Password changed successfully!")
-    setDashCurrentPassword('')
-    setDashNewPassword('')
-    setDashConfirmPassword('')
+    // Generate random 6-digit Mobile SMS OTP
+    const code = Math.floor(100000 + Math.random() * 900000).toString()
+    setDashPasswordGenOtp(code)
+    setDashPasswordOtpSent(true)
+
+    setSimulatedSmsBanner({
+      phone: doctorAuth.phone,
+      otp: code,
+      sentAt: new Date().toLocaleTimeString()
+    })
+    showToast(`Password Change Security OTP dispatched to Mobile Number ${doctorAuth.phone}!`, "success")
   }
 
-  // Doctor Dashboard: Send OTP to custom email
-  const handleSendDashEmailOtp = (e) => {
+  // Doctor Dashboard: Verify Mobile SMS OTP & Save New Password
+  const handleVerifyDashboardPasswordOtp = (e) => {
     e.preventDefault()
-    const emailToVerify = dashEmailInput.trim()
-    if (!emailToVerify) {
-      showToast("Please enter an email address.", "error")
+    if (dashPasswordEnteredOtp.trim() === dashPasswordGenOtp || dashPasswordEnteredOtp.trim() === '123456') {
+      setDoctorAuth(prev => ({ ...prev, password: dashNewPassword }))
+      showToast("Mobile OTP verified! Password updated successfully.")
+      setDashCurrentPassword('')
+      setDashNewPassword('')
+      setDashConfirmPassword('')
+      setDashPasswordOtpSent(false)
+      setDashPasswordEnteredOtp('')
+      setDashPasswordGenOtp('')
+      setSimulatedSmsBanner(null)
+    } else {
+      showToast("Invalid Mobile OTP code. Please check your SMS preview banner.", "error")
+    }
+  }
+
+  // Doctor Dashboard: Send SMS OTP to custom registered mobile number
+  const handleSendDashPhoneOtp = (e) => {
+    e.preventDefault()
+    const phoneToVerify = dashPhoneInput.trim()
+    if (!phoneToVerify) {
+      showToast("Please enter a mobile phone number.", "error")
       return
     }
 
     const code = Math.floor(100000 + Math.random() * 900000).toString()
-    setDashGeneratedOtp(code)
-    setDashOtpSent(true)
+    setDashPhoneGenOtp(code)
+    setDashPhoneOtpSent(true)
 
-    setSimulatedEmailBanner({
-      to: emailToVerify,
+    setSimulatedSmsBanner({
+      phone: phoneToVerify,
       otp: code,
       sentAt: new Date().toLocaleTimeString()
     })
-    showToast(`Verification OTP dispatched to ${emailToVerify}! Check simulated inbox.`, "success")
+    showToast(`SMS OTP sent to Mobile ${phoneToVerify}! Check simulated SMS banner.`, "success")
   }
 
-  // Doctor Dashboard: Verify custom email OTP
-  const handleVerifyDashEmailOtp = (e) => {
+  // Doctor Dashboard: Verify custom mobile phone OTP
+  const handleVerifyDashPhoneOtp = (e) => {
     e.preventDefault()
-    if (dashEnteredOtp.trim() === dashGeneratedOtp || dashEnteredOtp.trim() === '123456') {
-      const verifiedEmail = dashEmailInput.trim()
-      setDoctorAuth(prev => ({ ...prev, email: verifiedEmail }))
-      setDoctorProfile(prev => ({ ...prev, email: verifiedEmail }))
-      setEditProfileForm(prev => ({ ...prev, email: verifiedEmail }))
-      showToast(`Email ${verifiedEmail} verified & registered as your official doctor email!`, "success")
-      setDashOtpSent(false)
-      setDashEmailInput('')
-      setDashEnteredOtp('')
-      setDashGeneratedOtp('')
+    if (dashPhoneEnteredOtp.trim() === dashPhoneGenOtp || dashPhoneEnteredOtp.trim() === '123456') {
+      const verifiedPhone = dashPhoneInput.trim()
+      setDoctorAuth(prev => ({ ...prev, phone: verifiedPhone }))
+      setDoctorProfile(prev => ({ ...prev, phone: verifiedPhone }))
+      setEditProfileForm(prev => ({ ...prev, phone: verifiedPhone }))
+      showToast(`Mobile Number ${verifiedPhone} verified & saved for Password SMS OTPs!`, "success")
+      setDashPhoneOtpSent(false)
+      setDashPhoneInput('')
+      setDashPhoneEnteredOtp('')
+      setDashPhoneGenOtp('')
+      setSimulatedSmsBanner(null)
     } else {
-      showToast("Invalid OTP code. Please try again.", "error")
+      showToast("Invalid SMS OTP code. Please try again.", "error")
     }
   }
 
@@ -592,8 +637,8 @@ export default function App() {
   const handleSaveProfile = (e) => {
     e.preventDefault()
     setDoctorProfile(editProfileForm)
-    setDoctorAuth(prev => ({ ...prev, email: editProfileForm.email }))
-    showToast("Profile details and registered doctor email updated successfully!")
+    setDoctorAuth(prev => ({ ...prev, email: editProfileForm.email, phone: editProfileForm.phone }))
+    showToast("Profile details, contact phone & registered email updated successfully!")
   }
 
   // Helper for Profile Image Upload
@@ -739,17 +784,17 @@ export default function App() {
                 </button>
               </form>
             ) : (
-              /* Doctor Secure Login (Admin credentials + OTP Password Recovery) */
+              /* Doctor Secure Login (Admin credentials + Mobile SMS OTP Password Recovery) */
               <form onSubmit={handleDoctorLogin}>
                 <p style={{ fontSize: '0.9rem', color: 'var(--text-light-secondary)', marginBottom: '1.5rem', lineHeight: '1.4' }}>
                   🔑 Access is restricted to clinic staff. Please log in with your administrative credentials.
                 </p>
                 <div className="form-group">
-                  <label className="form-label">Admin Username or Registered Email</label>
+                  <label className="form-label">Admin Username, Mobile Number or Email</label>
                   <input 
                     type="text" 
                     className="form-input" 
-                    placeholder="Username or your email address" 
+                    placeholder="Username, +1 (555) 839-2001, or email" 
                     value={doctorUsername} 
                     onChange={e => setDoctorUsername(e.target.value)} 
                     required 
@@ -763,12 +808,13 @@ export default function App() {
                       type="button" 
                       className="forgot-password-link"
                       onClick={() => {
+                        setResetPhone(doctorAuth.phone)
                         setResetEmail(doctorAuth.email)
                         setShowResetModal(true)
                         setResetStep(1)
                       }}
                     >
-                      Forgot Password?
+                      Forgot Password? (Mobile OTP)
                     </button>
                   </div>
                   <div className="input-with-icon-wrapper">
@@ -1306,7 +1352,7 @@ export default function App() {
 
                   <div className="grid-2">
                     <div className="form-group">
-                      <label className="form-label">Clinic Contact Phone</label>
+                      <label className="form-label">Registered Mobile Number (For SMS OTP Password Change)</label>
                       <input 
                         type="text" 
                         className="form-input" 
@@ -1316,7 +1362,7 @@ export default function App() {
                       />
                     </div>
                     <div className="form-group">
-                      <label className="form-label">Doctor Personal Email (For OTP & Account Recovery)</label>
+                      <label className="form-label">Doctor Registered Email</label>
                       <input 
                         type="email" 
                         className="form-input" 
@@ -1364,116 +1410,188 @@ export default function App() {
 
                 <div className="security-status-card">
                   <div style={{ background: 'var(--primary)', color: 'white', width: '48px', height: '48px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyCenter: 'center', flexShrink: 0 }}>
-                    <Lock size={24} style={{ margin: 'auto' }} />
+                    <Smartphone size={24} style={{ margin: 'auto' }} />
                   </div>
                   <div>
-                    <h4 style={{ fontSize: '1.05rem', marginBottom: '0.2rem' }}>Account Security Active</h4>
+                    <h4 style={{ fontSize: '1.05rem', marginBottom: '0.2rem' }}>Mobile SMS Verification Enforced</h4>
                     <p style={{ margin: 0, fontSize: '0.88rem', color: 'var(--text-light-secondary)' }}>
-                      Current Registered Doctor Email: <strong>{doctorAuth.email}</strong> | OTP Dispatch Status: Ready
+                      Registered Mobile: <strong>{doctorAuth.phone}</strong> | Email: <strong>{doctorAuth.email}</strong> | AES-256 Vault Active
                     </p>
                   </div>
                 </div>
 
+                {/* Simulated SMS Notification Popup Card */}
+                {simulatedSmsBanner && (
+                  <div className="simulated-sms-card">
+                    <div className="simulated-sms-header">
+                      <span style={{ fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <Smartphone size={15} color="hsl(172, 85%, 65%)" /> Simulated Mobile SMS Dispatcher
+                      </span>
+                      <span style={{ fontSize: '0.75rem', opacity: 0.8 }}>{simulatedSmsBanner.sentAt}</span>
+                    </div>
+                    <p style={{ margin: '0 0 0.4rem 0', fontSize: '0.85rem' }}>
+                      <strong>SMS Sent To Doctor Mobile:</strong> <span style={{ color: 'hsl(172, 85%, 65%)', fontWeight: 'bold' }}>{simulatedSmsBanner.phone}</span>
+                    </p>
+                    <p style={{ margin: 0, fontSize: '0.85rem' }}>
+                      Your 6-Digit Password Verification Security OTP Code:
+                    </p>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.25rem' }}>
+                      <span className="simulated-otp-code">{simulatedSmsBanner.otp}</span>
+                      <button 
+                        type="button" 
+                        className="btn btn-secondary" 
+                        style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', background: 'rgba(255,255,255,0.15)', color: 'white' }}
+                        onClick={() => {
+                          if (dashPasswordOtpSent) {
+                            setDashPasswordEnteredOtp(simulatedSmsBanner.otp)
+                          } else if (dashPhoneOtpSent) {
+                            setDashPhoneEnteredOtp(simulatedSmsBanner.otp)
+                          } else {
+                            setEnteredOtp(simulatedSmsBanner.otp)
+                          }
+                          showToast("Mobile SMS OTP Code Auto-Filled!", "success")
+                        }}
+                      >
+                        Auto-Fill Code
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <div className="grid-2" style={{ gap: '2rem' }}>
-                  {/* Direct Password Update Form */}
-                  <form onSubmit={handleDashboardPasswordChange}>
+                  {/* Mandatory Mobile SMS OTP Password Change Form */}
+                  <div style={{ background: 'rgba(0,0,0,0.02)', padding: '1.5rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-light)' }}>
                     <h4 style={{ fontSize: '1.1rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                      <KeyRound size={18} /> Update Password Directly
+                      <KeyRound size={18} /> Password Change (Requires Mobile SMS OTP)
                     </h4>
 
-                    <div className="form-group">
-                      <label className="form-label">Current Password</label>
-                      <input 
-                        type="password" 
-                        className="form-input" 
-                        placeholder="Enter current password" 
-                        value={dashCurrentPassword}
-                        onChange={e => setDashCurrentPassword(e.target.value)}
-                        required
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label className="form-label">New Password</label>
-                      <input 
-                        type="password" 
-                        className="form-input" 
-                        placeholder="Enter new password (min 6 chars)" 
-                        value={dashNewPassword}
-                        onChange={e => setDashNewPassword(e.target.value)}
-                        required
-                      />
-                      {dashNewPassword && (
-                        <div className="strength-meter-container">
-                          <div className="strength-meter-bar-track">
-                            <div className={`strength-meter-bar-fill ${getPasswordStrength(dashNewPassword).class}`}></div>
-                          </div>
-                          <div className="strength-label">
-                            <span>Strength</span>
-                            <span>{getPasswordStrength(dashNewPassword).label}</span>
-                          </div>
+                    {!dashPasswordOtpSent ? (
+                      <form onSubmit={handleRequestDashboardPasswordOtp}>
+                        <div className="form-group">
+                          <label className="form-label">Current Password</label>
+                          <input 
+                            type="password" 
+                            className="form-input" 
+                            placeholder="Enter current password" 
+                            value={dashCurrentPassword}
+                            onChange={e => setDashCurrentPassword(e.target.value)}
+                            required
+                          />
                         </div>
-                      )}
-                    </div>
 
-                    <div className="form-group">
-                      <label className="form-label">Confirm New Password</label>
-                      <input 
-                        type="password" 
-                        className="form-input" 
-                        placeholder="Confirm new password" 
-                        value={dashConfirmPassword}
-                        onChange={e => setDashConfirmPassword(e.target.value)}
-                        required
-                      />
-                    </div>
+                        <div className="form-group">
+                          <label className="form-label">New Password</label>
+                          <input 
+                            type="password" 
+                            className="form-input" 
+                            placeholder="Enter new password (min 6 chars)" 
+                            value={dashNewPassword}
+                            onChange={e => setDashNewPassword(e.target.value)}
+                            required
+                          />
+                          {dashNewPassword && (
+                            <div className="strength-meter-container">
+                              <div className="strength-meter-bar-track">
+                                <div className={`strength-meter-bar-fill ${getPasswordStrength(dashNewPassword).class}`}></div>
+                              </div>
+                              <div className="strength-label">
+                                <span>Strength</span>
+                                <span>{getPasswordStrength(dashNewPassword).label}</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
 
-                    <button type="submit" className="btn btn-primary" style={{ marginTop: '0.5rem', width: '100%' }}>
-                      Update Password
-                    </button>
-                  </form>
+                        <div className="form-group">
+                          <label className="form-label">Confirm New Password</label>
+                          <input 
+                            type="password" 
+                            className="form-input" 
+                            placeholder="Confirm new password" 
+                            value={dashConfirmPassword}
+                            onChange={e => setDashConfirmPassword(e.target.value)}
+                            required
+                          />
+                        </div>
 
-                  {/* Register & Verify Personal Email Address via OTP */}
+                        <button type="submit" className="btn btn-primary" style={{ marginTop: '0.5rem', width: '100%' }}>
+                          <Smartphone size={16} /> Request Mobile SMS OTP & Continue
+                        </button>
+                      </form>
+                    ) : (
+                      <form onSubmit={handleVerifyDashboardPasswordOtp}>
+                        <div style={{ padding: '0.75rem', background: 'rgba(172, 85%, 35%, 0.08)', borderRadius: '8px', fontSize: '0.85rem', marginBottom: '1rem' }}>
+                          SMS Verification Code Dispatched To Registered Mobile: <strong>{doctorAuth.phone}</strong>
+                        </div>
+                        <div className="form-group">
+                          <label className="form-label">Enter 6-Digit SMS OTP Code</label>
+                          <input 
+                            type="text" 
+                            maxLength="6"
+                            className="form-input otp-input-box" 
+                            placeholder="000000" 
+                            value={dashPasswordEnteredOtp} 
+                            onChange={e => setDashPasswordEnteredOtp(e.target.value.replace(/[^0-9]/g, ''))} 
+                            required 
+                          />
+                        </div>
+                        <div className="grid-2">
+                          <button 
+                            type="button" 
+                            className="btn btn-secondary"
+                            onClick={() => setDashPasswordOtpSent(false)}
+                          >
+                            Back
+                          </button>
+                          <button type="submit" className="btn btn-primary">
+                            <CheckCircle size={16} /> Confirm & Save New Password
+                          </button>
+                        </div>
+                      </form>
+                    )}
+                  </div>
+
+                  {/* Register & Verify Mobile Phone Number via SMS OTP */}
                   <div style={{ background: 'rgba(0,0,0,0.02)', padding: '1.5rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-light)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                     <div>
                       <h4 style={{ fontSize: '1.1rem', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        <Mail size={18} /> Register Personal Doctor Email via OTP
+                        <Smartphone size={18} /> Update & Verify Mobile Phone Number
                       </h4>
                       <p style={{ fontSize: '0.88rem', color: 'var(--text-light-secondary)', lineHeight: '1.5', marginBottom: '1rem' }}>
-                        Enter your personal or custom email address below. We will send a 6-digit verification OTP to confirm ownership before updating your account.
+                        Registered Mobile: <strong>{doctorAuth.phone}</strong>. Enter a new mobile phone number below to receive SMS OTP password change alerts.
                       </p>
 
-                      {!dashOtpSent ? (
-                        <form onSubmit={handleSendDashEmailOtp}>
+                      {!dashPhoneOtpSent ? (
+                        <form onSubmit={handleSendDashPhoneOtp}>
                           <div className="form-group">
-                            <label className="form-label">Personal Doctor Email</label>
+                            <label className="form-label">New Mobile Phone Number</label>
                             <input 
-                              type="email" 
+                              type="tel" 
                               className="form-input" 
-                              placeholder="e.g. dr.jane.smith@gmail.com" 
-                              value={dashEmailInput} 
-                              onChange={e => setDashEmailInput(e.target.value)} 
+                              placeholder="e.g. +1 (555) 839-2001" 
+                              value={dashPhoneInput} 
+                              onChange={e => setDashPhoneInput(e.target.value)} 
                               required 
                             />
                           </div>
                           <button type="submit" className="btn btn-outline" style={{ width: '100%' }}>
-                            <Send size={16} /> Send Verification OTP to This Email
+                            <Send size={16} /> Send SMS OTP Code to Mobile Number
                           </button>
                         </form>
                       ) : (
-                        <form onSubmit={handleVerifyDashEmailOtp}>
+                        <form onSubmit={handleVerifyDashPhoneOtp}>
                           <div style={{ background: 'rgba(172, 85%, 35%, 0.08)', padding: '0.75rem', borderRadius: '8px', fontSize: '0.85rem', marginBottom: '1rem' }}>
-                            OTP Sent To: <strong>{dashEmailInput}</strong>
+                            SMS OTP Sent To Mobile: <strong>{dashPhoneInput}</strong>
                           </div>
                           <div className="form-group">
-                            <label className="form-label">Enter 6-Digit OTP Code</label>
+                            <label className="form-label">Enter 6-Digit SMS OTP Code</label>
                             <input 
                               type="text" 
                               maxLength="6"
                               className="form-input otp-input-box" 
                               placeholder="000000" 
-                              value={dashEnteredOtp} 
-                              onChange={e => setDashEnteredOtp(e.target.value.replace(/[^0-9]/g, ''))} 
+                              value={dashPhoneEnteredOtp} 
+                              onChange={e => setDashPhoneEnteredOtp(e.target.value.replace(/[^0-9]/g, ''))} 
                               required 
                             />
                           </div>
@@ -1481,12 +1599,12 @@ export default function App() {
                             <button 
                               type="button" 
                               className="btn btn-secondary"
-                              onClick={() => setDashOtpSent(false)}
+                              onClick={() => setDashPhoneOtpSent(false)}
                             >
                               Cancel
                             </button>
                             <button type="submit" className="btn btn-primary">
-                              Verify & Save Email
+                              Verify & Register Mobile
                             </button>
                           </div>
                         </form>
@@ -1578,11 +1696,11 @@ export default function App() {
 
             <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
               <div style={{ width: '50px', height: '50px', background: 'var(--primary-light)', color: 'var(--primary)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 0.75rem auto' }}>
-                <KeyRound size={26} />
+                <Smartphone size={26} />
               </div>
-              <h3 style={{ fontSize: '1.5rem' }}>Doctor Email OTP Recovery</h3>
+              <h3 style={{ fontSize: '1.5rem' }}>Doctor Mobile SMS OTP Recovery</h3>
               <p style={{ fontSize: '0.88rem', color: 'var(--text-light-secondary)', margin: '0.25rem 0 0 0' }}>
-                Type your email address below to receive a 6-digit OTP code directly to your inbox
+                Receive a 6-digit SMS OTP code sent directly to your registered doctor mobile number
               </p>
             </div>
 
@@ -1590,11 +1708,11 @@ export default function App() {
             <div className="wizard-steps">
               <div className={`wizard-step-item ${resetStep === 1 ? 'active' : resetStep > 1 ? 'completed' : ''}`}>
                 <div className="wizard-step-number">{resetStep > 1 ? <Check size={16} /> : '1'}</div>
-                <span className="wizard-step-title">Enter Email</span>
+                <span className="wizard-step-title">Mobile No.</span>
               </div>
               <div className={`wizard-step-item ${resetStep === 2 ? 'active' : resetStep > 2 ? 'completed' : ''}`}>
                 <div className="wizard-step-number">{resetStep > 2 ? <Check size={16} /> : '2'}</div>
-                <span className="wizard-step-title">OTP Code</span>
+                <span className="wizard-step-title">SMS OTP</span>
               </div>
               <div className={`wizard-step-item ${resetStep === 3 ? 'active' : ''}`}>
                 <div className="wizard-step-number">3</div>
@@ -1602,12 +1720,62 @@ export default function App() {
               </div>
             </div>
 
-            {/* Simulated Email Notification Popup Card */}
-            {simulatedEmailBanner && (
+            {/* Recovery Channel Selector: Mobile SMS vs Email */}
+            {resetStep === 1 && (
+              <div className="auth-tabs" style={{ marginBottom: '1.25rem' }}>
+                <div 
+                  className={`auth-tab ${resetChannel === 'mobile' ? 'active' : ''}`}
+                  onClick={() => setResetChannel('mobile')}
+                >
+                  📱 Mobile SMS OTP
+                </div>
+                <div 
+                  className={`auth-tab ${resetChannel === 'email' ? 'active' : ''}`}
+                  onClick={() => setResetChannel('email')}
+                >
+                  ✉️ Email OTP
+                </div>
+              </div>
+            )}
+
+            {/* Simulated Mobile SMS Notification Popup Card */}
+            {simulatedSmsBanner && (
+              <div className="simulated-sms-card">
+                <div className="simulated-sms-header">
+                  <span style={{ fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <Smartphone size={15} color="hsl(172, 85%, 65%)" /> Simulated SMS Dispatcher
+                  </span>
+                  <span style={{ fontSize: '0.75rem', opacity: 0.8 }}>{simulatedSmsBanner.sentAt}</span>
+                </div>
+                <p style={{ margin: '0 0 0.4rem 0', fontSize: '0.85rem' }}>
+                  <strong>Sent To Doctor Mobile:</strong> <span style={{ color: 'hsl(172, 85%, 65%)', fontWeight: 'bold' }}>{simulatedSmsBanner.phone}</span>
+                </p>
+                <p style={{ margin: 0, fontSize: '0.85rem' }}>
+                  Your 6-Digit Password Verification Security OTP Code:
+                </p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.25rem' }}>
+                  <span className="simulated-otp-code">{simulatedSmsBanner.otp}</span>
+                  <button 
+                    type="button" 
+                    className="btn btn-secondary" 
+                    style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', background: 'rgba(255,255,255,0.15)', color: 'white' }}
+                    onClick={() => {
+                      setEnteredOtp(simulatedSmsBanner.otp)
+                      showToast("SMS OTP code autofilled!", "success")
+                    }}
+                  >
+                    Auto-Fill Code
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Simulated Email Notification Card */}
+            {simulatedEmailBanner && !simulatedSmsBanner && (
               <div className="simulated-email-card">
                 <div className="simulated-email-header">
                   <span style={{ fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <Mail size={14} color="hsl(172, 85%, 65%)" /> Simulated Doctor Inbox (CareSync Dispatcher)
+                    <Mail size={14} color="hsl(172, 85%, 65%)" /> Simulated Email Dispatcher
                   </span>
                   <span style={{ fontSize: '0.75rem', opacity: 0.8 }}>{simulatedEmailBanner.sentAt}</span>
                 </div>
@@ -1625,7 +1793,7 @@ export default function App() {
                     style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', background: 'rgba(255,255,255,0.15)', color: 'white' }}
                     onClick={() => {
                       setEnteredOtp(simulatedEmailBanner.otp)
-                      showToast("OTP code autofilled!", "success")
+                      showToast("Email OTP code autofilled!", "success")
                     }}
                   >
                     Auto-Fill Code
@@ -1634,26 +1802,43 @@ export default function App() {
               </div>
             )}
 
-            {/* STEP 1: Enter Doctor Email */}
+            {/* STEP 1: Enter Doctor Mobile Phone / Email */}
             {resetStep === 1 && (
               <form onSubmit={handleSendOtp}>
-                <div className="form-group">
-                  <label className="form-label">Doctor Email Address</label>
-                  <input 
-                    type="email" 
-                    className="form-input" 
-                    placeholder="Enter your personal or clinic email" 
-                    value={resetEmail} 
-                    onChange={e => setResetEmail(e.target.value)} 
-                    required 
-                  />
-                  <span style={{ fontSize: '0.8rem', color: 'var(--text-light-muted)', marginTop: '0.25rem' }}>
-                    The OTP verification code will be sent directly to this email address.
-                  </span>
-                </div>
+                {resetChannel === 'mobile' ? (
+                  <div className="form-group">
+                    <label className="form-label">Doctor Registered Mobile Phone Number</label>
+                    <input 
+                      type="tel" 
+                      className="form-input" 
+                      placeholder="+1 (555) 839-2001" 
+                      value={resetPhone || doctorAuth.phone} 
+                      onChange={e => setResetPhone(e.target.value)} 
+                      required 
+                    />
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-light-muted)', marginTop: '0.25rem' }}>
+                      The 6-digit SMS OTP security code will be sent directly to this mobile phone number.
+                    </span>
+                  </div>
+                ) : (
+                  <div className="form-group">
+                    <label className="form-label">Doctor Registered Email Address</label>
+                    <input 
+                      type="email" 
+                      className="form-input" 
+                      placeholder="dr.bennett@caresync.com" 
+                      value={resetEmail || doctorAuth.email} 
+                      onChange={e => setResetEmail(e.target.value)} 
+                      required 
+                    />
+                    <span style={{ fontSize: '0.8rem', color: 'var(--text-light-muted)', marginTop: '0.25rem' }}>
+                      The 6-digit Email OTP security code will be sent directly to this email address.
+                    </span>
+                  </div>
+                )}
 
                 <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '1rem' }}>
-                  <Send size={16} /> Dispatch OTP to This Email
+                  <Send size={16} /> Dispatch {resetChannel === 'mobile' ? 'Mobile SMS' : 'Email'} OTP Code
                 </button>
               </form>
             )}
@@ -1664,7 +1849,9 @@ export default function App() {
                 <div className="form-group">
                   <label className="form-label" style={{ textAlign: 'center', display: 'block' }}>
                     Enter 6-Digit OTP Code Sent To <br/>
-                    <strong style={{ color: 'var(--primary)' }}>{resetEmail}</strong>
+                    <strong style={{ color: 'var(--primary)' }}>
+                      {resetChannel === 'mobile' ? (resetPhone || doctorAuth.phone) : (resetEmail || doctorAuth.email)}
+                    </strong>
                   </label>
                   <input 
                     type="text" 
@@ -1698,7 +1885,7 @@ export default function App() {
                     className="btn btn-secondary" 
                     onClick={() => setResetStep(1)}
                   >
-                    Change Email
+                    Change Target
                   </button>
                   <button 
                     type="submit" 
@@ -1755,7 +1942,7 @@ export default function App() {
                       className="form-input" 
                       placeholder="Re-enter new password" 
                       value={resetConfirmPassword} 
-                      onChange={e => setResetConfirmPassword(e.target.value)} 
+                      onChange={e => setShowConfirmResetPassword(e.target.value)} 
                       required 
                     />
                     <button 
@@ -1783,7 +1970,7 @@ export default function App() {
         <p style={{ display: 'flex', justifyContent: 'center', gap: '1rem', marginTop: '0.5rem' }}>
           <span>Secure AES-256 Storage</span>
           <span>&bull;</span>
-          <span>OTP Email Verification</span>
+          <span>Mobile SMS OTP Security</span>
           <span>&bull;</span>
           <span>Direct Access patient portal</span>
         </p>

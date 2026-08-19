@@ -991,6 +991,27 @@ body.dark-mode .otp-input-box {
   padding-bottom: 0.75rem;
   margin-bottom: 0.75rem;
 }
+
+/* Simulated Mobile SMS Notification Card */
+.simulated-sms-card {
+  background: linear-gradient(135deg, hsl(172, 85%, 20%), hsl(215, 80%, 20%));
+  color: white;
+  border-radius: var(--radius-md);
+  padding: 1.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: var(--shadow-lg);
+  margin-bottom: 1.5rem;
+  animation: slideUp 0.3s ease-out;
+}
+.simulated-sms-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  padding-bottom: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
 .simulated-otp-code {
   font-size: 1.4rem;
   font-weight: 800;
