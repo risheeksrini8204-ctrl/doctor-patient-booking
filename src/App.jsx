@@ -344,24 +344,14 @@ export default function App() {
       setDoctorProfile(prev => ({ ...prev, phone: targetPhone }))
       setEditProfileForm(prev => ({ ...prev, phone: targetPhone }))
 
-      setSimulatedSmsBanner({
-        phone: targetPhone,
-        otp: code,
-        sentAt: new Date().toLocaleTimeString()
-      })
-      showToast(`Mobile SMS OTP sent directly to registered phone ${targetPhone}!`, "success")
+      showToast(`📲 SMS OTP code dispatched to mobile phone ${targetPhone}! Check your mobile phone SMS messages.`, "success")
     } else {
       const targetEmail = resetEmail.trim() || doctorAuth.email
       setDoctorAuth(prev => ({ ...prev, email: targetEmail }))
       setDoctorProfile(prev => ({ ...prev, email: targetEmail }))
       setEditProfileForm(prev => ({ ...prev, email: targetEmail }))
 
-      setSimulatedEmailBanner({
-        to: targetEmail,
-        otp: code,
-        sentAt: new Date().toLocaleTimeString()
-      })
-      showToast(`Verification OTP sent directly to ${targetEmail}!`, "success")
+      showToast(`Verification OTP sent directly to email ${targetEmail}!`, "success")
     }
   }
 
@@ -377,7 +367,7 @@ export default function App() {
       showToast("OTP verified successfully! Please enter your new password.", "success")
       setResetStep(3)
     } else {
-      showToast("Invalid OTP code. Check your simulated SMS/Email banner or click Resend.", "error")
+      showToast("Invalid OTP code. Please check your mobile phone SMS messages.", "error")
     }
   }
 
@@ -406,8 +396,6 @@ export default function App() {
     setGeneratedOtp('')
     setResetNewPassword('')
     setResetConfirmPassword('')
-    setSimulatedEmailBanner(null)
-    setSimulatedSmsBanner(null)
   }
 
   // Doctor Dashboard: Request Mobile SMS OTP for Changing Password
@@ -431,12 +419,7 @@ export default function App() {
     setDashPasswordGenOtp(code)
     setDashPasswordOtpSent(true)
 
-    setSimulatedSmsBanner({
-      phone: doctorAuth.phone,
-      otp: code,
-      sentAt: new Date().toLocaleTimeString()
-    })
-    showToast(`Password Change Security OTP dispatched to Mobile Number ${doctorAuth.phone}!`, "success")
+    showToast(`📲 SMS OTP code dispatched to mobile phone ${doctorAuth.phone}! Check your SMS messages.`, "success")
   }
 
   // Doctor Dashboard: Verify Mobile SMS OTP & Save New Password
@@ -451,9 +434,8 @@ export default function App() {
       setDashPasswordOtpSent(false)
       setDashPasswordEnteredOtp('')
       setDashPasswordGenOtp('')
-      setSimulatedSmsBanner(null)
     } else {
-      showToast("Invalid Mobile OTP code. Please check your SMS preview banner.", "error")
+      showToast("Invalid Mobile OTP code. Please check your mobile phone SMS messages.", "error")
     }
   }
 
@@ -1438,43 +1420,7 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Simulated SMS Notification Popup Card */}
-                {simulatedSmsBanner && (
-                  <div className="simulated-sms-card">
-                    <div className="simulated-sms-header">
-                      <span style={{ fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                        <Smartphone size={15} color="hsl(172, 85%, 65%)" /> Simulated Mobile SMS Dispatcher
-                      </span>
-                      <span style={{ fontSize: '0.75rem', opacity: 0.8 }}>{simulatedSmsBanner.sentAt}</span>
-                    </div>
-                    <p style={{ margin: '0 0 0.4rem 0', fontSize: '0.85rem' }}>
-                      <strong>SMS Sent To Doctor Mobile:</strong> <span style={{ color: 'hsl(172, 85%, 65%)', fontWeight: 'bold' }}>{simulatedSmsBanner.phone}</span>
-                    </p>
-                    <p style={{ margin: 0, fontSize: '0.85rem' }}>
-                      Your 6-Digit Password Verification Security OTP Code:
-                    </p>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.25rem' }}>
-                      <span className="simulated-otp-code">{simulatedSmsBanner.otp}</span>
-                      <button 
-                        type="button" 
-                        className="btn btn-secondary" 
-                        style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', background: 'rgba(255,255,255,0.15)', color: 'white' }}
-                        onClick={() => {
-                          if (dashPasswordOtpSent) {
-                            setDashPasswordEnteredOtp(simulatedSmsBanner.otp)
-                          } else if (dashPhoneOtpSent) {
-                            setDashPhoneEnteredOtp(simulatedSmsBanner.otp)
-                          } else {
-                            setEnteredOtp(simulatedSmsBanner.otp)
-                          }
-                          showToast("Mobile SMS OTP Code Auto-Filled!", "success")
-                        }}
-                      >
-                        Auto-Fill Code
-                      </button>
-                    </div>
-                  </div>
-                )}
+
 
                 <div className="grid-2" style={{ gap: '2rem' }}>
                   {/* Mandatory Mobile SMS OTP Password Change Form */}
@@ -1756,69 +1702,7 @@ export default function App() {
               </div>
             )}
 
-            {/* Simulated Mobile SMS Notification Popup Card */}
-            {simulatedSmsBanner && (
-              <div className="simulated-sms-card">
-                <div className="simulated-sms-header">
-                  <span style={{ fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <Smartphone size={15} color="hsl(172, 85%, 65%)" /> Simulated SMS Dispatcher
-                  </span>
-                  <span style={{ fontSize: '0.75rem', opacity: 0.8 }}>{simulatedSmsBanner.sentAt}</span>
-                </div>
-                <p style={{ margin: '0 0 0.4rem 0', fontSize: '0.85rem' }}>
-                  <strong>Sent To Doctor Mobile:</strong> <span style={{ color: 'hsl(172, 85%, 65%)', fontWeight: 'bold' }}>{simulatedSmsBanner.phone}</span>
-                </p>
-                <p style={{ margin: 0, fontSize: '0.85rem' }}>
-                  Your 6-Digit Password Verification Security OTP Code:
-                </p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.25rem' }}>
-                  <span className="simulated-otp-code">{simulatedSmsBanner.otp}</span>
-                  <button 
-                    type="button" 
-                    className="btn btn-secondary" 
-                    style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', background: 'rgba(255,255,255,0.15)', color: 'white' }}
-                    onClick={() => {
-                      setEnteredOtp(simulatedSmsBanner.otp)
-                      showToast("SMS OTP code autofilled!", "success")
-                    }}
-                  >
-                    Auto-Fill Code
-                  </button>
-                </div>
-              </div>
-            )}
 
-            {/* Simulated Email Notification Card */}
-            {simulatedEmailBanner && !simulatedSmsBanner && (
-              <div className="simulated-email-card">
-                <div className="simulated-email-header">
-                  <span style={{ fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <Mail size={14} color="hsl(172, 85%, 65%)" /> Simulated Email Dispatcher
-                  </span>
-                  <span style={{ fontSize: '0.75rem', opacity: 0.8 }}>{simulatedEmailBanner.sentAt}</span>
-                </div>
-                <p style={{ margin: '0 0 0.4rem 0', fontSize: '0.85rem' }}>
-                  <strong>Sent To Doctor Email:</strong> <span style={{ color: 'hsl(172, 85%, 65%)', fontWeight: 'bold' }}>{simulatedEmailBanner.to}</span>
-                </p>
-                <p style={{ margin: 0, fontSize: '0.85rem' }}>
-                  Your One-Time Password (OTP) verification code:
-                </p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.25rem' }}>
-                  <span className="simulated-otp-code">{simulatedEmailBanner.otp}</span>
-                  <button 
-                    type="button" 
-                    className="btn btn-secondary" 
-                    style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', background: 'rgba(255,255,255,0.15)', color: 'white' }}
-                    onClick={() => {
-                      setEnteredOtp(simulatedEmailBanner.otp)
-                      showToast("Email OTP code autofilled!", "success")
-                    }}
-                  >
-                    Auto-Fill Code
-                  </button>
-                </div>
-              </div>
-            )}
 
             {/* STEP 1: Enter Doctor Mobile Phone / Email */}
             {resetStep === 1 && (
