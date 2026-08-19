@@ -786,9 +786,32 @@ export default function App() {
             ) : (
               /* Doctor Secure Login (Admin credentials + Mobile SMS OTP Password Recovery) */
               <form onSubmit={handleDoctorLogin}>
-                <p style={{ fontSize: '0.9rem', color: 'var(--text-light-secondary)', marginBottom: '1.5rem', lineHeight: '1.4' }}>
-                  🔑 Access is restricted to clinic staff. Please log in with your administrative credentials.
-                </p>
+                {/* Prominent Admin Credentials Badge */}
+                <div style={{ background: 'rgba(172, 85%, 35%, 0.08)', border: '1.5px solid var(--primary)', padding: '1rem', borderRadius: 'var(--radius-md)', marginBottom: '1.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.6rem' }}>
+                    <span style={{ fontSize: '0.88rem', fontWeight: '700', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <Lock size={16} /> Active Admin Credentials
+                    </span>
+                    <button 
+                      type="button" 
+                      className="btn btn-secondary" 
+                      style={{ padding: '0.25rem 0.65rem', fontSize: '0.78rem', background: 'var(--primary)', color: 'white' }}
+                      onClick={() => {
+                        setDoctorUsername(doctorAuth.username)
+                        setDoctorPassword(doctorAuth.password)
+                        showToast("Username & Password auto-filled into login form!", "success")
+                      }}
+                    >
+                      Auto-Fill Form
+                    </button>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.9rem' }}>
+                    <div><strong>Username:</strong> <code style={{ background: 'rgba(0,0,0,0.08)', padding: '2px 6px', borderRadius: '4px', fontSize: '0.95rem', fontWeight: 'bold' }}>{doctorAuth.username}</code></div>
+                    <div><strong>Password:</strong> <code style={{ background: 'rgba(0,0,0,0.08)', padding: '2px 6px', borderRadius: '4px', fontSize: '0.95rem', fontWeight: 'bold' }}>{doctorAuth.password}</code></div>
+                    <div><strong>Registered Mobile (SMS OTP):</strong> <code style={{ background: 'rgba(0,0,0,0.08)', padding: '2px 6px', borderRadius: '4px', fontSize: '0.85rem' }}>{doctorAuth.phone}</code></div>
+                  </div>
+                </div>
+
                 <div className="form-group">
                   <label className="form-label">Admin Username, Mobile Number or Email</label>
                   <input 
@@ -837,12 +860,7 @@ export default function App() {
                   </div>
                 </div>
 
-                <div style={{ fontSize: '0.82rem', color: 'var(--text-light-muted)', margin: '-0.25rem 0 1.5rem 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span>User: <code style={{ background: 'rgba(0,0,0,0.05)', padding: '2px 5px', borderRadius: '4px' }}>{doctorAuth.username}</code></span>
-                  <span>Pass: <code style={{ background: 'rgba(0,0,0,0.05)', padding: '2px 5px', borderRadius: '4px' }}>{doctorAuth.password}</code></span>
-                </div>
-
-                <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>
+                <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '0.5rem' }}>
                   <ShieldCheck size={18} /> Authenticate & Enter
                 </button>
               </form>
