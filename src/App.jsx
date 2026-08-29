@@ -36,8 +36,32 @@ import {
   Wifi
 } from 'lucide-react'
 
-// Central Cloud Storage Endpoint for Cross-Device Multi-Device Synchronization
-const CLOUD_SYNC_ENDPOINT = 'https://api.restful-api.dev/objects/ff808181a04ccf2d01a04eb25b910cb2'
+// Central Cloud Storage App Key for Unlimited Real-Time Cross-Device Multi-Device Syncing
+const CARESYNC_CLOUD_KEY = '1maoc1dg'
+const CLOUD_API_BASE = 'https://keyvalue.immanuel.co/api/KeyVal'
+
+// URL-Safe Base64 Encoders/Decoders for Real-Time Cross-Device Data Syncing
+const encodeCloudData = (obj) => {
+  try {
+    const jsonStr = JSON.stringify(obj)
+    const encoded = encodeURIComponent(jsonStr)
+    return btoa(encoded).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
+  } catch (e) {
+    return ''
+  }
+}
+
+const decodeCloudData = (b64Str) => {
+  try {
+    if (!b64Str || typeof b64Str !== 'string') return null
+    let base64 = b64Str.replace(/-/g, '+').replace(/_/g, '/')
+    while (base64.length % 4) base64 += '='
+    const decoded = decodeURIComponent(atob(base64))
+    return JSON.parse(decoded)
+  } catch (e) {
+    return null
+  }
+}
 
 // Default mock data in case cloud/localStorage is empty
 const defaultDoctorProfile = {
@@ -162,7 +186,7 @@ export default function App() {
 
   // Cloud Sync Indicator State ('synced', 'syncing', 'error')
   const [cloudSyncStatus, setCloudSyncStatus] = useState('synced')
-  const isPushingRef = useRef(false)
+  const isSyncingRef = useRef(false)
 
   // UI Navigation / Temporary States
   const [activeAuthTab, setActiveAuthTab] = useState('patient') // 'patient' or 'doctor'
@@ -260,121 +284,106 @@ export default function App() {
   }, [darkMode])
 
   // ================= CROSS-DEVICE REALTIME CLOUD SYNC ENGINE =================
-  // Pushes latest data payload to Central Cloud Endpoint
-  const syncToCloud = async (overrides = {}) => {
-    if (isPushingRef.current) return
-    isPushingRef.current = true
-    setCloudSyncStatus('syncing')
-
+  // Helper to push key-value payload to central cloud endpoint
+  const pushCloudDataset = async (key, data) => {
     try {
-      const payload = {
-        name: 'caresync_doctor_patient_booking_v1',
-        data: {
-          appointments: overrides.appointments || appointments,
-          feedbacks: overrides.feedbacks || feedbacks,
-          doctorProfile: overrides.doctorProfile || doctorProfile,
-          doctorAuth: overrides.doctorAuth || doctorAuth,
-          clinicTimings: overrides.clinicTimings || clinicTimings
-        }
-      }
-
-      await fetch(CLOUD_SYNC_ENDPOINT, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+      const b64 = encodeCloudData(data)
+      if (!b64) return
+      await fetch(`${CLOUD_API_BASE}/UpdateValue/${CARESYNC_CLOUD_KEY}/${key}/${b64}`, {
+        method: 'POST'
       })
-
-      setCloudSyncStatus('synced')
-    } catch (err) {
-      console.warn("Cloud sync push notice:", err)
-      setCloudSyncStatus('synced') // Fail softly and retain local data
-    } finally {
-      isPushingRef.current = false
+    } catch (e) {
+      console.warn(`Cloud dataset push notice (${key}):`, e)
     }
   }
 
-  // Periodic Cloud Synchronization Interval (Runs every 3 seconds across devices)
-  useEffect(() => {
-    let isMounted = true
+  // Helper to fetch key-value dataset from central cloud endpoint
+  const fetchCloudDataset = async (key) => {
+    try {
+      const res = await fetch(`${CLOUD_API_BASE}/GetValue/${CARESYNC_CLOUD_KEY}/${key}`)
+      if (!res.ok) return null
+      const b64Val = await res.json()
+      return decodeCloudData(b64Val)
+    } catch (e) {
+      console.warn(`Cloud dataset fetch notice (${key}):`, e)
+      return null
+    }
+  }
 
-    const fetchLatestFromCloud = async () => {
-      if (isPushingRef.current) return
+  // Main Cross-Device Real-Time Sync Logic
+  const syncWithCloudServer = async (manualNotice = false) => {
+    if (isSyncingRef.current) return
+    isSyncingRef.current = true
+    setCloudSyncStatus('syncing')
 
-      try {
-        const res = await fetch(CLOUD_SYNC_ENDPOINT)
-        if (!res.ok) return
-        const result = await res.json()
-        const cloudData = result.data
-
-        if (!cloudData || !isMounted) return
-
-        // Sync appointments from cloud across all patient & doctor devices
-        if (Array.isArray(cloudData.appointments) && cloudData.appointments.length > 0) {
-          setAppointments(prev => {
-            const prevStr = JSON.stringify(prev)
-            const cloudStr = JSON.stringify(cloudData.appointments)
-            if (prevStr !== cloudStr) {
-              return cloudData.appointments
-            }
-            return prev
-          })
-        }
-
-        // Sync patient feedback reviews across devices
-        if (Array.isArray(cloudData.feedbacks) && cloudData.feedbacks.length > 0) {
-          setFeedbacks(prev => {
-            const prevStr = JSON.stringify(prev)
-            const cloudStr = JSON.stringify(cloudData.feedbacks)
-            if (prevStr !== cloudStr) {
-              return cloudData.feedbacks
-            }
-            return prev
-          })
-        }
-
-        // Sync doctor profile across devices
-        if (cloudData.doctorProfile && cloudData.doctorProfile.name) {
-          setDoctorProfile(prev => {
-            if (JSON.stringify(prev) !== JSON.stringify(cloudData.doctorProfile)) {
-              return cloudData.doctorProfile
-            }
-            return prev
-          })
-        }
-
-        // Sync doctor auth & phone credentials across devices
-        if (cloudData.doctorAuth && cloudData.doctorAuth.username) {
-          setDoctorAuth(prev => {
-            if (JSON.stringify(prev) !== JSON.stringify(cloudData.doctorAuth)) {
-              return cloudData.doctorAuth
-            }
-            return prev
-          })
-        }
-
-        // Sync clinic timing slots across devices
-        if (cloudData.clinicTimings && cloudData.clinicTimings.startTime) {
-          setClinicTimings(prev => {
-            if (JSON.stringify(prev) !== JSON.stringify(cloudData.clinicTimings)) {
-              return cloudData.clinicTimings
-            }
-            return prev
-          })
-        }
-
-        setCloudSyncStatus('synced')
-      } catch (err) {
-        console.warn("Cloud pull notice:", err)
+    try {
+      // 1. Fetch Cloud Appointments
+      const cloudApps = await fetchCloudDataset('appointments')
+      if (Array.isArray(cloudApps)) {
+        setAppointments(prev => {
+          // Merge local and cloud appointments by ID
+          const appMap = new Map()
+          // Cloud appointments take priority for updated status
+          cloudApps.forEach(item => { if (item && item.id) appMap.set(item.id, item) })
+          prev.forEach(item => { if (item && item.id && !appMap.has(item.id)) appMap.set(item.id, item) })
+          
+          const merged = Array.from(appMap.values())
+          // Sort newest first
+          merged.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+          return merged
+        })
       }
-    }
 
-    fetchLatestFromCloud()
-    const syncInterval = setInterval(fetchLatestFromCloud, 3000)
+      // 2. Fetch Cloud Feedbacks
+      const cloudFeedbacks = await fetchCloudDataset('feedbacks')
+      if (Array.isArray(cloudFeedbacks)) {
+        setFeedbacks(prev => {
+          const feedbackMap = new Map()
+          cloudFeedbacks.forEach(item => { if (item && item.id) feedbackMap.set(item.id, item) })
+          prev.forEach(item => { if (item && item.id && !feedbackMap.has(item.id)) feedbackMap.set(item.id, item) })
 
-    return () => {
-      isMounted = false
-      clearInterval(syncInterval)
+          const merged = Array.from(feedbackMap.values())
+          merged.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+          return merged
+        })
+      }
+
+      // 3. Fetch Doctor Profile & Auth
+      const cloudProfile = await fetchCloudDataset('doctorProfile')
+      if (cloudProfile && cloudProfile.name) {
+        setDoctorProfile(cloudProfile)
+      }
+
+      const cloudAuth = await fetchCloudDataset('doctorAuth')
+      if (cloudAuth && cloudAuth.username) {
+        setDoctorAuth(cloudAuth)
+      }
+
+      const cloudTimings = await fetchCloudDataset('clinicTimings')
+      if (cloudTimings && cloudTimings.startTime) {
+        setClinicTimings(cloudTimings)
+      }
+
+      setCloudSyncStatus('synced')
+      if (manualNotice) {
+        showToast("Multi-device sync completed! Latest data fetched from Cloud.", "success")
+      }
+    } catch (err) {
+      console.warn("Cross-device sync check error:", err)
+      setCloudSyncStatus('error')
+    } finally {
+      isSyncingRef.current = false
     }
+  }
+
+  // Periodic Cloud Synchronization (Runs every 2 seconds across all mobile/desktop devices)
+  useEffect(() => {
+    syncWithCloudServer()
+    const syncInterval = setInterval(() => {
+      syncWithCloudServer()
+    }, 2000)
+
+    return () => clearInterval(syncInterval)
   }, [])
 
   // OTP Countdown timer hook
@@ -471,7 +480,7 @@ export default function App() {
       setDoctorProfile(prev => ({ ...prev, phone: targetPhone }))
       setEditProfileForm(prev => ({ ...prev, phone: targetPhone }))
 
-      syncToCloud({ doctorAuth: updatedAuth })
+      pushCloudDataset('doctorAuth', updatedAuth)
       showToast(`📲 SMS OTP code dispatched to mobile phone ${targetPhone}! Check your mobile phone SMS messages.`, "success")
     } else {
       const targetEmail = resetEmail.trim() || doctorAuth.email
@@ -480,7 +489,7 @@ export default function App() {
       setDoctorProfile(prev => ({ ...prev, email: targetEmail }))
       setEditProfileForm(prev => ({ ...prev, email: targetEmail }))
 
-      syncToCloud({ doctorAuth: updatedAuth })
+      pushCloudDataset('doctorAuth', updatedAuth)
       showToast(`Verification OTP sent directly to email ${targetEmail}!`, "success")
     }
   }
@@ -515,7 +524,7 @@ export default function App() {
 
     const updatedAuth = { ...doctorAuth, password: resetNewPassword }
     setDoctorAuth(updatedAuth)
-    syncToCloud({ doctorAuth: updatedAuth })
+    pushCloudDataset('doctorAuth', updatedAuth)
     showToast("Password updated successfully! You can now log in with your new password.", "success")
     setShowResetModal(false)
 
@@ -559,7 +568,7 @@ export default function App() {
     if (dashPasswordEnteredOtp.trim() === dashPasswordGenOtp || dashPasswordEnteredOtp.trim() === '123456') {
       const updatedAuth = { ...doctorAuth, password: dashNewPassword }
       setDoctorAuth(updatedAuth)
-      syncToCloud({ doctorAuth: updatedAuth })
+      pushCloudDataset('doctorAuth', updatedAuth)
       showToast("Mobile OTP verified! Password updated & synced across devices.")
       setDashCurrentPassword('')
       setDashNewPassword('')
@@ -599,7 +608,9 @@ export default function App() {
       setDoctorProfile(updatedProfile)
       setEditProfileForm(prev => ({ ...prev, phone: verifiedPhone }))
 
-      syncToCloud({ doctorAuth: updatedAuth, doctorProfile: updatedProfile })
+      pushCloudDataset('doctorAuth', updatedAuth)
+      pushCloudDataset('doctorProfile', updatedProfile)
+
       showToast(`Mobile Number ${verifiedPhone} verified & synced across all devices!`, "success")
       setDashPhoneOtpSent(false)
       setDashPhoneInput('')
@@ -657,7 +668,7 @@ export default function App() {
     return allSlots.filter(slot => !bookedTimes.includes(slot))
   }
 
-  // Handle Booking form submission with Cross-Device Cloud Syncing
+  // Handle Booking form submission with Instant Real-Time Cross-Device Cloud Syncing
   const handleBookAppointment = (e) => {
     e.preventDefault()
     if (!bookingDate) {
@@ -687,9 +698,9 @@ export default function App() {
     const updatedAppointments = [newApp, ...appointments]
     setAppointments(updatedAppointments)
     
-    // Sync newly booked appointment instantly to the cloud so Doctor Admin device receives it in real-time!
-    syncToCloud({ appointments: updatedAppointments })
-    showToast("Appointment booked successfully & synced to Doctor Admin!", "success")
+    // Instantly push new booking to Cloud DB so Doctor Admin device sees it in real-time!
+    pushCloudDataset('appointments', updatedAppointments)
+    showToast("Appointment booked successfully & synced live to Doctor Admin!", "success")
     
     // reset form
     setBookingDate('')
@@ -713,7 +724,7 @@ export default function App() {
     }
   }
 
-  // Handle Feedback Submission with Cross-Device Cloud Syncing
+  // Handle Feedback Submission with Instant Cross-Device Cloud Syncing
   const handleFeedbackSubmit = (e) => {
     e.preventDefault()
     if (!feedbackComment.trim() && !feedbackImage) {
@@ -733,8 +744,8 @@ export default function App() {
     const updatedFeedbacks = [newFeedback, ...feedbacks]
     setFeedbacks(updatedFeedbacks)
     
-    // Sync patient review feedback across all devices
-    syncToCloud({ feedbacks: updatedFeedbacks })
+    // Instantly push patient review to Cloud DB
+    pushCloudDataset('feedbacks', updatedFeedbacks)
     showToast("Thank you for your feedback! Synced across clinic devices.", "success")
 
     // reset
@@ -743,7 +754,7 @@ export default function App() {
     setFeedbackImage('')
   }
 
-  // Admin: Complete/Cancel Appointment with Cross-Device Cloud Syncing
+  // Admin: Complete/Cancel Appointment with Real-Time Cloud Syncing
   const updateAppointmentStatus = (id, newStatus) => {
     const updated = appointments.map(app => {
       if (app.id === id) {
@@ -752,7 +763,7 @@ export default function App() {
       return app
     })
     setAppointments(updated)
-    syncToCloud({ appointments: updated })
+    pushCloudDataset('appointments', updated)
     showToast(`Appointment status updated to ${newStatus} & synced across devices!`)
   }
 
@@ -764,7 +775,8 @@ export default function App() {
     setDoctorProfile(updatedProfile)
     setDoctorAuth(updatedAuth)
 
-    syncToCloud({ doctorProfile: updatedProfile, doctorAuth: updatedAuth })
+    pushCloudDataset('doctorProfile', updatedProfile)
+    pushCloudDataset('doctorAuth', updatedAuth)
     showToast("Profile details & contact details updated and synced across all devices!")
   }
 
@@ -786,7 +798,7 @@ export default function App() {
     const updatedTimings = editTimingsForm
     setClinicTimings(updatedTimings)
 
-    syncToCloud({ clinicTimings: updatedTimings })
+    pushCloudDataset('clinicTimings', updatedTimings)
     showToast("Clinic timings updated & synced across all devices!")
   }
 
@@ -831,11 +843,22 @@ export default function App() {
           {/* Multi-Device Real-Time Cloud Sync Badge */}
           <div 
             className="user-badge" 
-            style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10b981', border: '1px solid #10b981', display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem' }}
-            title="Realtime Multi-Device Sync Active: Patient bookings sync across all phones & doctor admin devices instantly"
+            style={{ 
+              background: cloudSyncStatus === 'syncing' ? 'rgba(245, 158, 11, 0.15)' : 'rgba(16, 185, 129, 0.12)', 
+              color: cloudSyncStatus === 'syncing' ? '#f59e0b' : '#10b981', 
+              border: `1px solid ${cloudSyncStatus === 'syncing' ? '#f59e0b' : '#10b981'}`, 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '0.4rem', 
+              fontSize: '0.8rem',
+              cursor: 'pointer'
+            }}
+            onClick={() => syncWithCloudServer(true)}
+            title="Click to force manual sync across devices"
           >
-            <Globe size={14} className="spin-slow" />
-            <span>Cross-Device Cloud Syncing Active</span>
+            <Globe size={14} className={cloudSyncStatus === 'syncing' ? 'spin-slow' : ''} />
+            <span>{cloudSyncStatus === 'syncing' ? 'Syncing...' : 'Realtime Cloud Sync Active'}</span>
+            <RefreshCw size={12} style={{ marginLeft: '2px', opacity: 0.8 }} />
           </div>
 
           {/* Light/Dark mode toggle */}
@@ -1309,9 +1332,18 @@ export default function App() {
           <div className="glass-card">
             {doctorActiveTab === 'appointments' && (
               <div>
-                <h3 style={{ fontSize: '1.4rem', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <Calendar size={22} /> Appointment Bookings Ledger
-                </h3>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+                  <h3 style={{ fontSize: '1.4rem', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Calendar size={22} /> Appointment Bookings Ledger
+                  </h3>
+                  <button 
+                    className="btn btn-secondary" 
+                    onClick={() => syncWithCloudServer(true)}
+                    style={{ fontSize: '0.85rem', padding: '0.4rem 0.8rem' }}
+                  >
+                    <RefreshCw size={14} className={cloudSyncStatus === 'syncing' ? 'spin-slow' : ''} /> Force Sync Cloud
+                  </button>
+                </div>
 
                 {appointments.length > 0 ? (
                   <div className="appointment-list">
